@@ -466,6 +466,9 @@ class PlanningService:
     def get_build_options(self) -> PlanningBuildOptionsResponse:
         return PlanningBuildOptionsResponse(site_id=SITE_ID, sections=BUILD_SECTIONS)
 
+    def get_build_section_definition(self, infrastructure_type: InfrastructureCategory) -> BuildSectionDefinition:
+        return self._get_build_section(infrastructure_type)
+
     def _get_build_section(self, infrastructure_type: InfrastructureCategory) -> BuildSectionDefinition:
         for section in BUILD_SECTIONS:
             if section.infrastructure_type == infrastructure_type:
@@ -617,6 +620,25 @@ class PlanningService:
             resolved_infrastructure_details=normalized_details,
         )
 
+    def build_geometry_summary(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        geometry_points: list[GeometryPoint],
+    ) -> GeometryLocationSummaryResponse:
+        return self._build_geometry_summary(infrastructure_type, geometry_points)
+
+    def merge_geometry_details(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+        geometry_summary: GeometryLocationSummaryResponse | None,
+    ) -> dict[str, Any]:
+        return self._merge_geometry_into_details(
+            infrastructure_type=infrastructure_type,
+            infrastructure_details=infrastructure_details,
+            geometry_summary=geometry_summary,
+        )
+
     def _coerce_numeric_value(self, value: Any, field_name: str) -> float:
         if isinstance(value, bool):
             raise ValueError(f"Field '{field_name}' must be a number.")
@@ -698,6 +720,13 @@ class PlanningService:
 
         buildout_years = int(details.get("construction_years", DEFAULT_BUILDOUT_YEARS[infrastructure_type]))
         return project_type, details, footprint_acres, traffic, buildout_years
+
+    def resolve_infrastructure_inputs(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+    ) -> tuple[PlannerProjectType, dict[str, str | int | float | bool], float, int, int]:
+        return self._resolve_infrastructure_inputs(infrastructure_type, infrastructure_details)
 
     def get_site(self) -> PlanningSiteResponse:
         continents = []

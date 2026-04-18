@@ -126,6 +126,34 @@ Backend:
 6. runs submitted and mitigated scenarios
 7. returns scorecards and recommendation
 
+### 6. Text-To-Plan Draft And Run
+
+`POST /api/v1/planning/text/draft`
+
+Frontend sends:
+- `location`
+- mapped `geometry_points`
+- `user_prompt`
+
+Backend:
+1. retrieves the relevant internal planner schema for airport vs road
+2. asks Gemini to extract the likely planning fields
+3. merges geometry-derived values from the mapped line
+4. returns a reviewable draft with missing fields, assumptions, confidence, and readiness
+
+`POST /api/v1/planning/text/run`
+
+Frontend sends the same input plus:
+- `mitigation_commitment`
+- optional `confirmed_overrides`
+
+Backend:
+1. repeats the grounded extraction flow
+2. applies user-confirmed overrides
+3. validates required fields
+4. runs the existing proposal assessment pipeline
+5. returns both the extraction summary and the final simulation result
+
 ## Current Planner Contract
 
 Location is now explicit.
@@ -242,6 +270,7 @@ Protected backend routes:
 `My Projects` stores:
 - the saved planning assessment snapshot
 - the recommendation and comparison output
+- optional text-planning extraction metadata from the prompt flow
 - later AI analysis text or PDF metadata
 
 It does not store the whole mutable simulation world state.
@@ -265,6 +294,15 @@ It does not store the whole mutable simulation world state.
 10. If the user is signed in, call `POST /api/v1/my-projects`
 11. When a report is generated later, call `PATCH /api/v1/my-projects/{project_id}/report`
 
+For text-driven planning:
+1. Let the user map the line first
+2. Collect a natural-language prompt like “I want to build an airport in this area”
+3. Call `POST /api/v1/planning/text/draft`
+4. Show the extracted fields, missing values, and confidence
+5. Let the user confirm any overrides
+6. Call `POST /api/v1/planning/text/run`
+7. Optionally save the finished result to `My Projects`
+
 ## Other API Endpoints
 
 ### Health
@@ -287,6 +325,10 @@ It does not store the whole mutable simulation world state.
 
 ### Report Generation
 - `POST /api/v1/simulation/report`
+
+### Text Planning
+- `POST /api/v1/planning/text/draft`
+- `POST /api/v1/planning/text/run`
 
 ## Deployment
 
@@ -372,4 +414,4 @@ Local URLs:
 ## Verification
 
 Current test status:
-- `101 passed, 7 deselected`
+- `110 passed, 7 deselected`

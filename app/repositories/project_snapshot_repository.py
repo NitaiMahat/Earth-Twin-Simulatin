@@ -50,10 +50,17 @@ class ProjectSnapshotRepository:
                         location_label TEXT NOT NULL,
                         recommended_option TEXT NOT NULL,
                         assessment_payload JSONB NOT NULL,
+                        text_planning_payload JSONB NOT NULL DEFAULT '{{}}'::jsonb,
                         latest_report_payload JSONB NOT NULL DEFAULT '{{}}'::jsonb,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
+                    """
+                )
+                cursor.execute(
+                    f"""
+                    ALTER TABLE {self._table_name}
+                    ADD COLUMN IF NOT EXISTS text_planning_payload JSONB NOT NULL DEFAULT '{{}}'::jsonb
                     """
                 )
                 cursor.execute(
@@ -92,12 +99,13 @@ class ProjectSnapshotRepository:
                         location_label,
                         recommended_option,
                         assessment_payload,
+                        text_planning_payload,
                         latest_report_payload
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
                     RETURNING project_id, user_id, user_email, project_name, continent_id, project_type,
                         infrastructure_type, location_label, recommended_option, assessment_payload,
-                        latest_report_payload, created_at, updated_at
+                        text_planning_payload, latest_report_payload, created_at, updated_at
                     """,
                     (
                         record["project_id"],
@@ -110,6 +118,7 @@ class ProjectSnapshotRepository:
                         record["location_label"],
                         record["recommended_option"],
                         json.dumps(record["assessment_payload"]),
+                        json.dumps(record.get("text_planning_payload", {})),
                         json.dumps(record.get("latest_report_payload", {})),
                     ),
                 )
@@ -134,7 +143,7 @@ class ProjectSnapshotRepository:
                     f"""
                     SELECT project_id, user_id, user_email, project_name, continent_id, project_type,
                         infrastructure_type, location_label, recommended_option, assessment_payload,
-                        latest_report_payload, created_at, updated_at
+                        text_planning_payload, latest_report_payload, created_at, updated_at
                     FROM {self._table_name}
                     WHERE user_id = %s
                     ORDER BY updated_at DESC
@@ -161,7 +170,7 @@ class ProjectSnapshotRepository:
                     f"""
                     SELECT project_id, user_id, user_email, project_name, continent_id, project_type,
                         infrastructure_type, location_label, recommended_option, assessment_payload,
-                        latest_report_payload, created_at, updated_at
+                        text_planning_payload, latest_report_payload, created_at, updated_at
                     FROM {self._table_name}
                     WHERE user_id = %s AND project_id = %s
                     """,
@@ -190,7 +199,7 @@ class ProjectSnapshotRepository:
                     WHERE user_id = %s AND project_id = %s
                     RETURNING project_id, user_id, user_email, project_name, continent_id, project_type,
                         infrastructure_type, location_label, recommended_option, assessment_payload,
-                        latest_report_payload, created_at, updated_at
+                        text_planning_payload, latest_report_payload, created_at, updated_at
                     """,
                     (json.dumps(report_payload), user_id, project_id),
                 )
@@ -214,7 +223,8 @@ class ProjectSnapshotRepository:
             "location_label": row[7],
             "recommended_option": row[8],
             "assessment_payload": row[9],
-            "latest_report_payload": row[10] or {},
-            "created_at": row[11].isoformat(),
-            "updated_at": row[12].isoformat(),
+            "text_planning_payload": row[10] or {},
+            "latest_report_payload": row[11] or {},
+            "created_at": row[12].isoformat(),
+            "updated_at": row[13].isoformat(),
         }

@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from app.core.config import settings
+from app.models.domain.planning import InfrastructureCategory, PlannerProjectType
 
 _MODEL = "gemini-2.5-flash"
 _MAX_RETRIES = 3
@@ -60,6 +61,12 @@ class GeminiService:
 
         raise RuntimeError(f"Gemini API failed after {_MAX_RETRIES} attempts: {last_exc}")
 
+    def _parse_json_response(self, text: str) -> Any:
+        normalized_text = re.sub(r"^```(?:json)?\s*", "", text)
+        normalized_text = re.sub(r"\s*```$", "", normalized_text)
+        normalized_text = normalized_text.strip()
+        return json.loads(normalized_text)
+
     def goal_to_actions(
         self,
         goal: str,
@@ -95,14 +102,85 @@ Each object must have exactly: "action_type" (string), "intensity" (0.1-1.0), "d
 Example: [{{"action_type":"improve_public_transit","intensity":0.7,"duration_years":3}}]"""
 
         text = self._generate(prompt)
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-        text = text.strip()
-
-        actions: list[dict[str, Any]] = json.loads(text)
+        actions: list[dict[str, Any]] = self._parse_json_response(text)
         if not isinstance(actions, list):
             raise ValueError("Gemini returned a non-array response")
         return actions
+
+    def extract_text_plan(
+        self,
+        *,
+        user_prompt: str,
+        retrieved_context: str,
+        location_label: str,
+        geometry_summary: dict[str, Any],
+    ) -> dict[str, Any]:
+        prompt = f"""You are an infrastructure planning assistant.
+
+User prompt:
+{user_prompt}
+
+Selected location:
+{location_label}
+
+Geometry summary from the mapped points:
+{json.dumps(geometry_summary, indent=2)}
+
+Allowed grounded planning context:
+{retrieved_context}
+
+Instructions:
+- Use ONLY the supported infrastructure types described in the grounded planning context.
+- Only infer values that are directly stated or are safe to infer from the grounded context.
+- Do NOT invent geometry-derived values. Those come from the backend geometry summary.
+- If the user's prompt is ambiguous between the supported types, set "infrastructure_type" to null and explain in assumptions.
+- If the prompt clearly asks for an unsupported type, set "infrastructure_type" to "unsupported".
+- Keep missing required values in "missing_fields" instead of guessing.
+
+Return ONLY valid JSON with exactly these keys:
+- infrastructure_type: "airport", "road", null, or "unsupported"
+- project_type: "industrial_facility", "roadway_logistics_expansion", null
+- planner_summary: short normalized summary string
+- infrastructure_details: object with extracted fields only
+- missing_fields: array of field names still needed
+- assumptions: array of short strings
+- confidence: number from 0 to 1
+- simulation_ready: boolean
+"""
+
+        payload = self._parse_json_response(self._generate(prompt))
+        if not isinstance(payload, dict):
+            raise ValueError("Gemini returned a non-object extraction response")
+
+        infrastructure_type = payload.get("infrastructure_type")
+        if infrastructure_type not in {None, "unsupported"}:
+            InfrastructureCategory(str(infrastructure_type))
+
+        project_type = payload.get("project_type")
+        if project_type is not None:
+            PlannerProjectType(str(project_type))
+
+        missing_fields = payload.get("missing_fields", [])
+        assumptions = payload.get("assumptions", [])
+        details = payload.get("infrastructure_details", {})
+
+        if not isinstance(missing_fields, list):
+            raise ValueError("Gemini returned non-list missing_fields")
+        if not isinstance(assumptions, list):
+            raise ValueError("Gemini returned non-list assumptions")
+        if not isinstance(details, dict):
+            raise ValueError("Gemini returned non-object infrastructure_details")
+
+        return {
+            "infrastructure_type": infrastructure_type,
+            "project_type": project_type,
+            "planner_summary": str(payload.get("planner_summary", "")).strip(),
+            "infrastructure_details": details,
+            "missing_fields": [str(field).strip() for field in missing_fields if str(field).strip()],
+            "assumptions": [str(item).strip() for item in assumptions if str(item).strip()],
+            "confidence": max(0.0, min(1.0, float(payload.get("confidence", 0.0)))),
+            "simulation_ready": bool(payload.get("simulation_ready", False)),
+        }
 
     def suggest_improvements(
         self,

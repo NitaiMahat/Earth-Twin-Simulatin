@@ -13,6 +13,7 @@ from app.models.api.responses import (
     SavedProjectDetailResponse,
     SavedProjectListResponse,
     SavedProjectSummaryResponse,
+    SavedTextPlanningSnapshotResponse,
 )
 from app.models.domain.auth import AuthenticatedUser
 from app.models.domain.planning import (
@@ -65,6 +66,36 @@ class ProjectSnapshotService:
             latest_report=self._report_response(record.get("latest_report_payload") if isinstance(record, dict) else {}),
         )
 
+    def _text_planning_response(
+        self,
+        payload: dict[str, object] | None,
+    ) -> SavedTextPlanningSnapshotResponse | None:
+        text_payload = payload or {}
+        user_prompt = text_payload.get("user_prompt")
+        planner_summary = text_payload.get("planner_summary")
+        if not isinstance(user_prompt, str) or not isinstance(planner_summary, str):
+            return None
+
+        infrastructure_type = text_payload.get("inferred_infrastructure_type")
+        return SavedTextPlanningSnapshotResponse(
+            user_prompt=user_prompt,
+            planner_summary=planner_summary,
+            inferred_infrastructure_type=(
+                InfrastructureCategory(str(infrastructure_type)) if infrastructure_type else None
+            ),
+            assumptions=[
+                str(item)
+                for item in text_payload.get("assumptions", [])
+                if isinstance(item, str) and item.strip()
+            ],
+            missing_fields=[
+                str(item)
+                for item in text_payload.get("missing_fields", [])
+                if isinstance(item, str) and item.strip()
+            ],
+            used_user_overrides=bool(text_payload.get("used_user_overrides", False)),
+        )
+
     def _detail_response(self, record: dict[str, object]) -> SavedProjectDetailResponse:
         return SavedProjectDetailResponse(
             project_id=str(record["project_id"]),
@@ -73,6 +104,9 @@ class ProjectSnapshotService:
             updated_at=str(record["updated_at"]),
             assessment=ProposalAssessmentResponse.model_validate(record["assessment_payload"]),
             latest_report=self._report_response(record.get("latest_report_payload") if isinstance(record, dict) else {}),
+            text_planning=self._text_planning_response(
+                record.get("text_planning_payload") if isinstance(record, dict) else {}
+            ),
         )
 
     def save_project(
@@ -90,6 +124,7 @@ class ProjectSnapshotService:
         buildout_years: int | None,
         mitigation_commitment: MitigationCommitment,
         planner_notes: str | None,
+        text_planning: dict[str, object] | None = None,
     ) -> SavedProjectDetailResponse:
         repository = self._require_repository()
         assessment = planning_service.assess_proposal(
@@ -117,6 +152,7 @@ class ProjectSnapshotService:
                 "location_label": assessment.location_context.label,
                 "recommended_option": assessment.recommended_option,
                 "assessment_payload": assessment_payload,
+                "text_planning_payload": text_planning or {},
                 "latest_report_payload": {},
             }
         )

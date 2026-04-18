@@ -34,6 +34,7 @@ def save_project_snapshot(
         buildout_years=payload.buildout_years,
         mitigation_commitment=payload.mitigation_commitment,
         planner_notes=payload.planner_notes,
+        text_planning=payload.text_planning.model_dump(mode="json") if payload.text_planning is not None else None,
     )
 
 

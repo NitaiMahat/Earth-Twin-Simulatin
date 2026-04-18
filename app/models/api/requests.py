@@ -141,8 +141,40 @@ class GenerateReportRequest(BaseModel):
     ai_analysis: str = ""
 
 
+class TextPlanningOverridesRequest(BaseModel):
+    infrastructure_type: InfrastructureCategory | None = None
+    project_type: PlannerProjectType | None = None
+    infrastructure_details: dict[str, Any] = Field(default_factory=dict)
+    footprint_acres: float | None = Field(default=None, gt=0, le=5000)
+    estimated_daily_vehicle_trips: int | None = Field(default=None, ge=0, le=50000)
+    buildout_years: int | None = Field(default=None, ge=1, le=25)
+
+
+class SavedTextPlanningSnapshotRequest(BaseModel):
+    user_prompt: str = Field(min_length=5, max_length=4000)
+    planner_summary: str
+    inferred_infrastructure_type: InfrastructureCategory | None = None
+    assumptions: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+    used_user_overrides: bool = False
+
+
+class TextPlanningDraftRequest(BaseModel):
+    location: PlanningLocationInput
+    geometry_points: list[GeometryPoint] = Field(min_length=2)
+    user_prompt: str = Field(min_length=5, max_length=4000)
+    project_name: str | None = Field(default=None, min_length=3, max_length=120)
+    planner_notes: str | None = None
+
+
+class TextPlanningRunRequest(TextPlanningDraftRequest):
+    mitigation_commitment: MitigationCommitment
+    confirmed_overrides: TextPlanningOverridesRequest | None = None
+
+
 class SaveProjectRequest(ProposalAssessmentRequest):
     project_name: str = Field(min_length=3, max_length=120)
+    text_planning: SavedTextPlanningSnapshotRequest | None = None
 
 
 class SaveProjectReportRequest(BaseModel):

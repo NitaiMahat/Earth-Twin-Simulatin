@@ -257,6 +257,27 @@ class ProposalAssessmentResponse(BaseModel):
     simulation_inputs: PlannerSimulationInputsResponse
 
 
+class TextPlanningExtractionResponse(BaseModel):
+    location_context: PlanningLocationContextResponse
+    geometry_summary: GeometryLocationSummaryResponse
+    infrastructure_type: InfrastructureCategory | None
+    project_type: PlannerProjectType | None
+    planner_summary: str
+    infrastructure_details: dict[str, str | int | float | bool]
+    footprint_acres: float | None
+    estimated_daily_vehicle_trips: int | None
+    buildout_years: int | None
+    missing_fields: list[str]
+    assumptions: list[str]
+    confidence: float
+    simulation_ready: bool
+
+
+class TextPlanningRunResponse(BaseModel):
+    extraction: TextPlanningExtractionResponse
+    assessment: ProposalAssessmentResponse
+
+
 class GoalActionItem(BaseModel):
     action_type: str
     intensity: float
@@ -287,6 +308,15 @@ class ProjectReportMetadataResponse(BaseModel):
     updated_at: str | None = None
 
 
+class SavedTextPlanningSnapshotResponse(BaseModel):
+    user_prompt: str
+    planner_summary: str
+    inferred_infrastructure_type: InfrastructureCategory | None = None
+    assumptions: list[str]
+    missing_fields: list[str]
+    used_user_overrides: bool
+
+
 class SavedProjectSummaryResponse(BaseModel):
     project_id: str
     project_name: str
@@ -307,6 +337,7 @@ class SavedProjectDetailResponse(BaseModel):
     updated_at: str
     assessment: ProposalAssessmentResponse
     latest_report: ProjectReportMetadataResponse
+    text_planning: SavedTextPlanningSnapshotResponse | None = None
 
 
 class SavedProjectListResponse(BaseModel):

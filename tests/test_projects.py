@@ -148,3 +148,33 @@ def test_update_project_report_metadata() -> None:
     assert payload["latest_report"]["ai_analysis"] == "Mitigated option meaningfully lowers pollution pressure."
     assert payload["latest_report"]["pdf_filename"] == "chicago-solar.pdf"
     assert payload["latest_report"]["pdf_url"] == "https://storage.example.com/reports/chicago-solar.pdf"
+
+
+def test_save_project_persists_text_planning_snapshot() -> None:
+    save_response = client.post(
+        "/api/v1/my-projects",
+        json={
+            "project_name": "Chicago Text Plan",
+            "location": CHICAGO_LOCATION,
+            "project_type": "industrial_facility",
+            "footprint_acres": 45,
+            "estimated_daily_vehicle_trips": 2600,
+            "buildout_years": 4,
+            "mitigation_commitment": "medium",
+            "text_planning": {
+                "user_prompt": "I want to build an airport in this area.",
+                "planner_summary": "Airport concept with mapped runway alignment.",
+                "inferred_infrastructure_type": "airport",
+                "assumptions": ["Runway length came from mapped points."],
+                "missing_fields": [],
+                "used_user_overrides": True,
+            },
+        },
+    )
+
+    assert save_response.status_code == 200
+    payload = save_response.json()
+    assert payload["text_planning"]["user_prompt"] == "I want to build an airport in this area."
+    assert payload["text_planning"]["planner_summary"] == "Airport concept with mapped runway alignment."
+    assert payload["text_planning"]["inferred_infrastructure_type"] == "airport"
+    assert payload["text_planning"]["used_user_overrides"] is True
