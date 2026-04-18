@@ -17,6 +17,8 @@ from reportlab.platypus import (  # type: ignore[import]
     TableStyle,
 )
 
+from app.models.api.responses import ProposalAssessmentResponse
+
 _GREEN = colors.HexColor("#1a7a4a")
 _DARK = colors.HexColor("#1a1a2e")
 _LIGHT_GREEN = colors.HexColor("#e8f5e9")
@@ -307,3 +309,82 @@ def generate_pdf_report(
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
+
+
+def generate_assessment_pdf_report(assessment: ProposalAssessmentResponse) -> bytes:
+    analysis_document = assessment.analysis_document
+    metric_cards = analysis_document.metric_cards
+
+    initial_metrics = {
+        "sustainability_score": metric_cards[0].baseline_value if metric_cards else 0.0,
+        "tree_cover": 0.0,
+        "biodiversity_score": 0.0,
+        "pollution_level": next((card.baseline_value for card in metric_cards if card.label == "Pollution Level"), 0.0),
+        "traffic_level": next((card.baseline_value for card in metric_cards if card.label == "Traffic Level"), 0.0),
+        "temperature": next((card.baseline_value for card in metric_cards if card.label == "Temperature"), 0.0),
+        "ecosystem_health": next((card.baseline_value for card in metric_cards if card.label == "Ecosystem Health"), 0.0),
+        "risk_level": assessment.submitted_plan.highest_risk_zone.risk_level if assessment.submitted_plan.highest_risk_zone else "unknown",
+    }
+    recommended_plan = assessment.mitigated_plan if assessment.recommended_option == "mitigated_plan" else assessment.submitted_plan
+    recommended_action_source = (
+        assessment.simulation_inputs.mitigated_actions
+        if assessment.recommended_option == "mitigated_plan"
+        else assessment.simulation_inputs.submitted_actions
+    )
+    final_metrics = {
+        "tree_cover": initial_metrics["tree_cover"],
+        "biodiversity_score": initial_metrics["biodiversity_score"],
+        "pollution_level": next(
+            (
+                card.mitigated_value if assessment.recommended_option == "mitigated_plan" else card.submitted_value
+                for card in metric_cards
+                if card.label == "Pollution Level"
+            ),
+            initial_metrics["pollution_level"],
+        ),
+        "traffic_level": next(
+            (
+                card.mitigated_value if assessment.recommended_option == "mitigated_plan" else card.submitted_value
+                for card in metric_cards
+                if card.label == "Traffic Level"
+            ),
+            initial_metrics["traffic_level"],
+        ),
+        "temperature": next(
+            (
+                card.mitigated_value if assessment.recommended_option == "mitigated_plan" else card.submitted_value
+                for card in metric_cards
+                if card.label == "Temperature"
+            ),
+            initial_metrics["temperature"],
+        ),
+        "ecosystem_health": next(
+            (
+                card.mitigated_value if assessment.recommended_option == "mitigated_plan" else card.submitted_value
+                for card in metric_cards
+                if card.label == "Ecosystem Health"
+            ),
+            initial_metrics["ecosystem_health"],
+        ),
+        "risk_level": recommended_plan.highest_risk_zone.risk_level if recommended_plan.highest_risk_zone else "unknown",
+    }
+
+    return generate_pdf_report(
+        goal=analysis_document.simulated_project_summary,
+        zone_name=assessment.location_context.label,
+        zone_type=assessment.infrastructure_type.value if assessment.infrastructure_type is not None else assessment.project_type.value,
+        actions=[
+            {
+                "action_type": action.requested_action_type,
+                "intensity": action.intensity,
+                "duration_years": action.duration_years,
+            }
+            for action in recommended_action_source
+        ],
+        initial_metrics=initial_metrics,
+        final_metrics=final_metrics,
+        projection_years=assessment.simulation_inputs.projection_years,
+        sustainability_score=recommended_plan.plan_score,
+        overall_outlook=recommended_plan.overall_outlook,
+        ai_analysis=analysis_document.ai_analysis or analysis_document.summary,
+    )

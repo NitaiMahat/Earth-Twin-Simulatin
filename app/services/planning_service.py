@@ -34,6 +34,7 @@ from app.models.domain.planning import (
 from app.models.domain.simulation import ProjectionSimulationResult
 from app.models.domain.zone import ZoneState
 from app.services.action_mapper import action_mapper
+from app.services.analysis_document_service import analysis_document_service
 from app.services.impact_service import impact_service
 from app.services.public_baseline_service import GLOBAL_WORLD_ID, public_baseline_service
 from app.services.simulation_engine import simulation_engine
@@ -1025,6 +1026,24 @@ class PlanningService:
         if comparison.key_tradeoffs:
             comparison_summary = f"{comparison_summary} {comparison.key_tradeoffs[0]}"
 
+        submitted_scorecard = self._build_scorecard(resolved_project_type, submitted_projection, submitted_action_inputs)
+        mitigated_scorecard = self._build_scorecard(resolved_project_type, mitigated_projection, mitigated_action_inputs)
+        analysis_document = analysis_document_service.build_document(
+            location_label=location_context.label,
+            planner_notes=planner_notes,
+            infrastructure_type=infrastructure_type,
+            project_type=resolved_project_type,
+            baseline_zone=location_zone,
+            baseline_zone_id=location_context.baseline_zone_id,
+            submitted_projection=submitted_projection,
+            mitigated_projection=mitigated_projection,
+            submitted_actions=submitted_action_inputs,
+            mitigated_actions=mitigated_action_inputs,
+            submitted_top_risks=submitted_scorecard.top_risks,
+            mitigated_top_risks=mitigated_scorecard.top_risks,
+            recommended_option=recommended_option,
+        )
+
         return ProposalAssessmentResponse(
             location_context=self._location_context_response(location_context),
             continent_id=location_context.continent_id,
@@ -1037,10 +1056,11 @@ class PlanningService:
             buildout_years=resolved_buildout_years,
             mitigation_commitment=mitigation_commitment,
             planner_notes=planner_notes,
-            submitted_plan=self._build_scorecard(resolved_project_type, submitted_projection, submitted_action_inputs),
-            mitigated_plan=self._build_scorecard(resolved_project_type, mitigated_projection, mitigated_action_inputs),
+            submitted_plan=submitted_scorecard,
+            mitigated_plan=mitigated_scorecard,
             recommended_option=recommended_option,
             comparison_summary=comparison_summary,
+            analysis_document=analysis_document,
             simulation_inputs=PlannerSimulationInputsResponse(
                 projection_years=DEFAULT_PROJECTION_YEARS,
                 baseline_zone_id=location_context.baseline_zone_id,
