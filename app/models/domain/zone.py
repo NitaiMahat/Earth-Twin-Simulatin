@@ -8,6 +8,7 @@ from app.core.constants import RiskLevel
 
 
 class ZoneType(str, Enum):
+    CONTINENT = "continent"
     FOREST = "forest"
     CITY = "city"
     INDUSTRIAL = "industrial"
@@ -20,6 +21,11 @@ class ZoneState(BaseModel):
     zone_id: str
     name: str
     type: ZoneType
+    scope: str = "continent"
+    latitude: float | None = None
+    longitude: float | None = None
+    reference_country_code: str | None = None
+    source_summary: str | None = None
     tree_cover: float = Field(ge=0, le=100)
     biodiversity_score: float = Field(ge=0, le=100)
     pollution_level: float = Field(ge=0, le=100)

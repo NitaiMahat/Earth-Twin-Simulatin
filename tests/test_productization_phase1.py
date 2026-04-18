@@ -12,7 +12,7 @@ client = TestClient(app)
 def test_apply_action_request_defaults_mode_to_planning() -> None:
     payload = ApplyActionRequest.model_validate(
         {
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "reduce_green_space",
             "intensity": 0.5,
             "duration_years": 2,
@@ -25,7 +25,7 @@ def test_apply_action_request_defaults_mode_to_planning() -> None:
 def test_project_request_defaults_mode_to_planning() -> None:
     payload = ProjectFutureRequest.model_validate(
         {
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "actions": [],
         }
@@ -37,14 +37,14 @@ def test_project_request_defaults_mode_to_planning() -> None:
 def test_ai_request_defaults_audience_from_mode() -> None:
     learning_payload = AIExplainRequest.model_validate(
         {
-            "zone_id": "zone_arterial_infill_corridor",
+            "zone_id": "continent_north_america",
             "question": "What is happening here?",
             "mode": "learning",
         }
     )
     planning_payload = AIExplainRequest.model_validate(
         {
-            "zone_id": "zone_arterial_infill_corridor",
+            "zone_id": "continent_north_america",
             "question": "What is happening here?",
         }
     )
@@ -56,7 +56,7 @@ def test_ai_request_defaults_audience_from_mode() -> None:
 def test_ai_request_respects_explicit_audience_override() -> None:
     payload = AIExplainRequest.model_validate(
         {
-            "zone_id": "zone_arterial_infill_corridor",
+            "zone_id": "continent_north_america",
             "question": "What is happening here?",
             "mode": "learning",
             "audience": "educator",
@@ -75,7 +75,7 @@ def test_action_mapper_accepts_product_and_legacy_action_labels() -> None:
 def test_zone_responses_include_sustainability_score() -> None:
     client.post("/api/v1/world/reset")
     world_response = client.get("/api/v1/world")
-    zone_response = client.get("/api/v1/zones/zone_arterial_infill_corridor")
+    zone_response = client.get("/api/v1/zones/continent_north_america")
 
     assert world_response.status_code == 200
     assert zone_response.status_code == 200
@@ -92,7 +92,7 @@ def test_apply_action_accepts_product_facing_action_type() -> None:
     response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "reduce_green_space",
             "intensity": 0.5,
             "duration_years": 2,

@@ -5,7 +5,13 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.domain.action import AudienceType, SimulationMode
-from app.models.domain.planning import GeometryPoint, InfrastructureCategory, MitigationCommitment, PlannerProjectType
+from app.models.domain.planning import (
+    GeometryPoint,
+    InfrastructureCategory,
+    MitigationCommitment,
+    PlannerProjectType,
+    PlanningLocationInput,
+)
 
 
 class ApplyActionRequest(BaseModel):
@@ -68,8 +74,7 @@ class CompareScenariosRequest(BaseModel):
 
 
 class ProposalAssessmentRequest(BaseModel):
-    site_id: str
-    area_id: str
+    location: PlanningLocationInput
     project_type: PlannerProjectType | None = None
     infrastructure_type: InfrastructureCategory | None = None
     geometry_points: list[GeometryPoint] = Field(default_factory=list)
@@ -99,8 +104,7 @@ class ProposalAssessmentRequest(BaseModel):
 
 
 class GeometryResolutionRequest(BaseModel):
-    site_id: str
-    area_id: str
+    location: PlanningLocationInput
     infrastructure_type: InfrastructureCategory
     geometry_points: list[GeometryPoint] = Field(min_length=2)
     infrastructure_details: dict[str, Any] = Field(default_factory=dict)
@@ -109,7 +113,7 @@ class GeometryResolutionRequest(BaseModel):
 class GoalToActionsRequest(BaseModel):
     goal: str = Field(min_length=5, max_length=500)
     zone_id: str
-    base_world_id: str = "illinois_calumet_corridor_demo"
+    base_world_id: str = "global_continental_baseline"
 
 
 class SuggestImprovementsRequest(BaseModel):
@@ -135,3 +139,13 @@ class GenerateReportRequest(BaseModel):
     sustainability_score: float
     overall_outlook: str
     ai_analysis: str = ""
+
+
+class SaveProjectRequest(ProposalAssessmentRequest):
+    project_name: str = Field(min_length=3, max_length=120)
+
+
+class SaveProjectReportRequest(BaseModel):
+    ai_analysis: str | None = None
+    pdf_url: str | None = Field(default=None, max_length=2000)
+    pdf_filename: str | None = Field(default=None, max_length=255)

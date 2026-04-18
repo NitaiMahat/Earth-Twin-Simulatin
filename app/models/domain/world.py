@@ -8,6 +8,7 @@ from app.models.domain.zone import ZoneState
 class WorldState(BaseModel):
     world_id: str
     name: str
+    baseline_mode: str = "dynamic_public"
     current_year: int = Field(ge=2000, le=2200)
     global_temperature: float
     global_co2_index: float

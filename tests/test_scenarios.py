@@ -50,7 +50,7 @@ def test_run_template_returns_projection_without_mutating_live_world() -> None:
     assert payload["projection_years"] == 6
     assert payload["summary"]
     assert payload["summary_text"]
-    assert len(payload["projected_zones"]) == 4
+    assert len(payload["projected_zones"]) == 7
     assert 0 <= payload["sustainability_score"] <= 100
 
     current_world = client.get("/api/v1/world").json()["world"]

@@ -1,257 +1,276 @@
 # Earth Twin Backend
 
-Earth Twin Backend is a FastAPI service for an infrastructure planning demo. It is built to help planners, municipalities, and local governments quickly test how a proposed project might affect environmental risk and sustainability before anything is built.
+Earth Twin Backend is a FastAPI service for global infrastructure planning and environmental simulation.
 
-This backend is designed to be easy for frontend teams to use:
-- it exposes planner-friendly endpoints
-- it describes which form fields each infrastructure type needs
-- it supports map-driven point selection
-- it calculates geometry from clicked map points
-- it converts those values into a simulation automatically
+The backend no longer boots from a fixed Illinois demo world. It now builds a dynamic global baseline around the 7 continents and supports a location-first planner flow:
+- the world view is continent-based
+- planning starts from latitude/longitude, not a predefined demo parcel
+- current baseline conditions are pulled from public data providers where possible
+- simulations run from that current baseline instead of from hardcoded demo zones
+- authenticated users can save planning snapshots in `My Projects`
 
-Important: this is a deterministic planning demo backend, not a scientific climate model and not a full GIS platform.
+Important: this is now more realistic than the original demo, but it is still a planning simulator, not a scientific digital twin of Earth.
 
-## What The Product Does
+## What Is Real Now
 
-The backend supports one main workflow:
-1. choose a demo planning area in Illinois
-2. choose an infrastructure type such as road, bridge, buildings, airport, general area, or solar panel
-3. either fill in infrastructure details manually or draw/select points on a map
-4. let the backend derive values like road length, runway length, or site area
-5. run a 5-year simulation
-6. compare the submitted plan against a stronger mitigated alternative
-7. return a planner-friendly scorecard and recommendation
+The backend currently uses public data to build live or latest-available baseline conditions:
+- Open-Meteo weather for current temperature
+- Open-Meteo air-quality for current AQI
+- World Bank public indicators where available for land-cover and density context
+- Nominatim reverse geocoding for country and state enrichment
+- optional Postgres-backed provider cache for persistent snapshot reuse across restarts
 
-The current demo is centered on one fixed site:
-- `illinois_calumet_corridor_demo`
+The world is generated as 7 continent records:
+- `continent_africa`
+- `continent_antarctica`
+- `continent_asia`
+- `continent_europe`
+- `continent_north_america`
+- `continent_oceania`
+- `continent_south_america`
 
-Within that site, the user chooses one of three proposal areas:
-- `calumet_industrial_strip`
-- `arterial_infill_corridor`
-- `river_buffer_redevelopment`
+Each continent is returned through the existing world and zone APIs, but the records now represent continent-scale regions instead of demo parcels.
 
-## Why It Is Useful
+## What Is Still Modeled
 
-This backend is useful because it gives a frontend application a ready-made planning engine without requiring the frontend to own complex business logic.
+Not every environmental signal can be truly real-time.
 
-It helps with:
-- infrastructure proposal intake
-- dynamic form generation
-- map-based geometry input
-- environmental risk explanation
-- scenario comparison
-- demo-ready recommendation outputs
+These parts are still modeled or inferred:
+- sustainability score weighting
+- long-term scenario deltas after a build proposal
+- project impact rules like roadway, industrial, restoration, and tree-loss effects
+- biodiversity and ecosystem-health synthesis from the observed baseline metrics
 
-For planners and municipalities, that means they can explore questions like:
-- what happens if we add a new road corridor here?
-- how risky is an airport runway expansion in this zone?
-- what does a solar field or redevelopment area do to sustainability?
-- does a mitigated version of the plan perform better?
+So the product should now be described like this:
+- baseline conditions are source-backed
+- future project impact is modeled
+- recommendations are scenario estimates, not guarantees
 
-For frontend developers, it means they do not need to hardcode:
-- every infrastructure form shape
-- geometry calculations
-- simulation mapping logic
-- planner scorecard logic
+## Core Product Flows
 
-## Current Infrastructure Types
+### 1. Global World Baseline
 
-The backend currently supports these infrastructure sections:
-- `road`
-- `bridge`
-- `buildings`
-- `airport`
-- `general_area`
-- `solar_panel`
+`GET /api/v1/world`
 
-Each section includes its own field definitions and map interaction mode.
+Returns the dynamic global baseline world with 7 continent entries.
 
-Examples:
-- `road`
-  - lane count
-  - daily vehicle trips
-  - optional paved area
-  - map line tool to derive `length_km`
-- `bridge`
-  - deck width
-  - daily vehicle trips
-  - optional approach area
-  - map line tool to derive `span_length_m`
-- `airport`
-  - runway width
-  - terminal area
-  - apron area
-  - daily vehicle trips
-  - map line tool to derive `runway_length_m`
-- `buildings`
-  - building count
-  - total floor area
-  - daily trips
-  - map polygon tool to derive `site_area_sq_m`
-- `general_area`
-  - impervious surface percentage
-  - daily trips
-  - map polygon tool to derive `site_area_sq_m`
-- `solar_panel`
-  - capacity
-  - battery storage
-  - maintenance trips
-  - map polygon tool to derive `panel_field_area_sq_m`
+`POST /api/v1/world/reset`
 
-## How Map-Based Geometry Works
+Refreshes the world from the current public baseline sources.
 
-The backend supports a map-first frontend flow.
+### 2. Continent Views
 
-Frontend responsibilities:
-- show the map
-- let the user click points
-- draw the selected line or polygon
-- send the clicked points to the backend
-- render the returned preview and simulation result
+`GET /api/v1/zones`
 
-Backend responsibilities:
-- validate the point selection
-- calculate geometry values from the clicked points
-- derive infrastructure-specific fields
-- run the simulation
-- return planner scorecards and recommendations
+Returns the 7 continent records.
 
-The current geometry calculations are backend math, not external APIs:
-- line-based infrastructure uses the Haversine formula to calculate straight-line distance from latitude/longitude points
-- polygon-based infrastructure converts lat/lng to a local XY plane and computes polygon area
+`GET /api/v1/zones/{zone_id}`
 
-This is intentional for the demo:
-- fast
-- free
-- deterministic
-- easy to test
+Returns a continent detail view with:
+- risk summary
+- top drivers
+- recommended focus
 
-Current limitation:
-- it does not snap to real road networks
-- it does not call parcel GIS services
-- it does not use real airport or zoning datasets
-
-So if a user clicks two points for a road, the backend computes straight-line distance, not actual road travel distance.
-
-## Main Planner Endpoints
-
-### 1. Get Site Metadata
+### 3. Global Planning Metadata
 
 `GET /api/v1/planning/site`
 
-Use this to load the Illinois demo site and its proposal areas.
-
-### 2. Get Build Section Metadata
+Returns planner metadata for the global location-first flow:
+- `site_id` = `global_location_planner`
+- continent list
+- current continent risk levels
+- supported infrastructure sections
 
 `GET /api/v1/planning/build-options`
 
-Use this to drive the frontend form builder.
+Returns the infrastructure form schema for:
+- road
+- bridge
+- buildings
+- airport
+- general_area
+- solar_panel
 
-This endpoint returns:
-- infrastructure sections
-- section summaries
-- field definitions
-- map tool definitions
-
-The frontend should use this endpoint to decide:
-- which card to show for each infrastructure type
-- which fields are required
-- whether the user should draw a line or polygon
-- how many points are expected
-
-### 3. Resolve Geometry From Clicked Points
+### 4. Geometry Resolution
 
 `POST /api/v1/planning/geometry/resolve`
 
-Use this to preview geometry-derived values after the user clicks points on the map.
+Frontend sends:
+- `location`
+- `infrastructure_type`
+- `geometry_points`
+- `infrastructure_details`
 
-Examples of derived values:
-- road length
-- bridge span
-- runway length
-- site area
-- solar field area
+Backend returns:
+- resolved location context
+- resolved continent context
+- reverse-geocoded country and state when available
+- geometry summary
+- derived infrastructure values
 
-This is the best endpoint for:
-- live preview
-- "did the map selection work?" checks
-- showing auto-filled values before simulation
-
-### 4. Assess a Proposal
+### 5. Proposal Assessment
 
 `POST /api/v1/planning/proposals/assess`
 
-Use this to run the actual planning simulation.
+Frontend sends:
+- `location`
+- infrastructure details or project type details
+- mitigation commitment
 
-This endpoint returns:
-- resolved project type
-- derived infrastructure details
-- footprint and traffic buckets
-- submitted plan scorecard
-- mitigated plan scorecard
-- recommended option
-- comparison summary
+Backend:
+1. resolves the continent from the submitted coordinates
+2. reverse-geocodes the point for country and state context when available
+3. builds a live/current location baseline
+4. reuses cached provider snapshots when possible
+5. inserts that baseline into the global world copy
+6. runs submitted and mitigated scenarios
+7. returns scorecards and recommendation
+
+## Current Planner Contract
+
+Location is now explicit.
+
+Example `location` object:
+
+```json
+{
+  "latitude": 41.8781,
+  "longitude": -87.6298,
+  "label": "Chicago Test Location",
+  "country_code": "USA"
+}
+```
+
+Example geometry resolve request:
+
+```json
+{
+  "location": {
+    "latitude": 41.8781,
+    "longitude": -87.6298,
+    "label": "Chicago Test Location",
+    "country_code": "USA"
+  },
+  "infrastructure_type": "road",
+  "geometry_points": [
+    { "latitude": 41.6401, "longitude": -87.5601 },
+    { "latitude": 41.6501, "longitude": -87.5401 }
+  ],
+  "infrastructure_details": {
+    "lane_count": 4,
+    "daily_vehicle_trips": 1800,
+    "construction_years": 3
+  }
+}
+```
+
+Example proposal assessment request:
+
+```json
+{
+  "location": {
+    "latitude": 41.8781,
+    "longitude": -87.6298,
+    "label": "Chicago Freight Corridor",
+    "country_code": "USA"
+  },
+  "infrastructure_type": "airport",
+  "geometry_points": [
+    { "latitude": 41.6400, "longitude": -87.5700 },
+    { "latitude": 41.6540, "longitude": -87.5450 }
+  ],
+  "infrastructure_details": {
+    "runway_width_m": 45,
+    "terminal_area_sq_m": 18000,
+    "apron_area_sq_m": 42000,
+    "daily_vehicle_trips": 3200,
+    "construction_years": 5
+  },
+  "mitigation_commitment": "medium",
+  "planner_notes": "Regional cargo airport expansion."
+}
+```
+
+## Frontend Responsibilities
+
+Frontend should handle:
+- map rendering
+- point selection
+- polygon/line drawing
+- location picker UX
+- account/session UX if added later
+- rendering scorecards, charts, and reports
+
+Frontend should not hardcode:
+- geometry math
+- continent resolution
+- infrastructure field rules
+- scorecard generation
+- mitigation comparison logic
+
+## Backend Responsibilities
+
+Backend now owns:
+- continent world generation
+- location-to-continent resolution
+- reverse geocoding and country normalization
+- public baseline ingestion
+- cached provider snapshots, with optional Postgres persistence
+- geometry resolution
+- infrastructure normalization
+- project simulation
+- sustainability/risk scoring
+- comparison between submitted and mitigated plans
+- Supabase token verification for protected routes
+- user-owned project snapshot persistence and report metadata
+
+## Auth And My Projects
+
+Supabase should handle sign-in on the frontend. The frontend then sends the Supabase access token to the backend as:
+
+```http
+Authorization: Bearer <supabase_access_token>
+```
+
+Protected backend routes:
+- `GET /api/v1/auth/me`
+- `GET /api/v1/my-projects`
+- `POST /api/v1/my-projects`
+- `GET /api/v1/my-projects/{project_id}`
+- `PATCH /api/v1/my-projects/{project_id}/report`
+
+`My Projects` stores:
+- the saved planning assessment snapshot
+- the recommendation and comparison output
+- later AI analysis text or PDF metadata
+
+It does not store the whole mutable simulation world state.
 
 ## Recommended Frontend Flow
 
-The best frontend integration flow is:
-
 1. Call `GET /api/v1/planning/site`
 2. Call `GET /api/v1/planning/build-options`
-3. Let the user choose:
-   - area
-   - infrastructure type
-4. Read the chosen section's `map_tool`
-5. Let the user click:
-   - 2 points for line tools
-   - 3+ points for polygon tools
+3. Let user choose infrastructure type
+4. Let user pick a real location on the map
+5. Let user draw geometry
 6. Call `POST /api/v1/planning/geometry/resolve`
-7. Show the user the derived values
-8. Submit the final proposal to `POST /api/v1/planning/proposals/assess`
+7. Show derived values and resolved continent
+8. Call `POST /api/v1/planning/proposals/assess`
 9. Render:
+   - `location_context`
    - `submitted_plan`
    - `mitigated_plan`
    - `recommended_option`
    - `comparison_summary`
-
-## Example Requests
-
-### Build Options
-
-```bash
-curl http://127.0.0.1:8000/api/v1/planning/build-options
-```
-
-### Geometry Resolve For Road
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/planning/geometry/resolve ^
-  -H "Content-Type: application/json" ^
-  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"arterial_infill_corridor\",\"infrastructure_type\":\"road\",\"geometry_points\":[{\"latitude\":41.6401,\"longitude\":-87.5601},{\"latitude\":41.6501,\"longitude\":-87.5401}],\"infrastructure_details\":{\"lane_count\":4,\"daily_vehicle_trips\":1800,\"construction_years\":3}}"
-```
-
-### Proposal Assessment For Airport Using Map Points
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/planning/proposals/assess ^
-  -H "Content-Type: application/json" ^
-  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"infrastructure_type\":\"airport\",\"geometry_points\":[{\"latitude\":41.6400,\"longitude\":-87.5700},{\"latitude\":41.6540,\"longitude\":-87.5450}],\"infrastructure_details\":{\"runway_width_m\":45,\"terminal_area_sq_m\":18000,\"apron_area_sq_m\":42000,\"daily_vehicle_trips\":3200,\"construction_years\":5},\"mitigation_commitment\":\"medium\",\"planner_notes\":\"Regional cargo airport expansion.\"}"
-```
+10. If the user is signed in, call `POST /api/v1/my-projects`
+11. When a report is generated later, call `PATCH /api/v1/my-projects/{project_id}/report`
 
 ## Other API Endpoints
 
 ### Health
 - `GET /api/v1/health`
 
-### World State
-- `GET /api/v1/world`
-- `POST /api/v1/world/reset`
-
-### Zone Views
-- `GET /api/v1/zones`
-- `GET /api/v1/zones/{zone_id}`
-
-### Raw Simulation APIs
+### Raw Simulation
 - `POST /api/v1/simulation/apply`
 - `POST /api/v1/simulation/project`
 - `POST /api/v1/simulation/compare`
@@ -263,38 +282,72 @@ curl -X POST http://127.0.0.1:8000/api/v1/planning/proposals/assess ^
 
 ### AI Explain
 - `POST /api/v1/ai/explain`
+- `POST /api/v1/ai/goal-to-actions`
+- `POST /api/v1/ai/suggest-improvements`
+
+### Report Generation
+- `POST /api/v1/simulation/report`
 
 ## Deployment
 
-This repo is ready for GitHub-based deployment.
-
-Included deploy files:
-- `render.yaml`
-- `Procfile`
-- `runtime.txt`
-
-Recommended free hosting path:
+Recommended free host:
 - Render
 
-Current deployed example:
-- docs: `https://earth-twin-simulatin.onrender.com/docs`
-- base: `https://earth-twin-simulatin.onrender.com`
-
-Important environment variable:
-- `CORS_ORIGINS`
-  - set to `*` for broad demo access
-  - or set to specific frontend domains like:
-  - `http://localhost:3000,https://your-frontend-domain.vercel.app`
-
-Render settings:
+Required Render settings:
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - Health Check Path: `/api/v1/health`
+
+Important environment variables:
+- `CORS_ORIGINS`
+- `GEMINI_API_KEY` if using Gemini endpoints
+
+Optional tuning:
+- `DATABASE_URL`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `SUPABASE_JWT_SECRET`
+- `SUPABASE_JWT_AUDIENCE`
+- `SUPABASE_JWT_ISSUER`
+- `PROVIDER_CACHE_TABLE_NAME`
+- `PUBLIC_DATA_TIMEOUT_SECONDS`
+- `PROVIDER_CACHE_TTL_SECONDS`
+- `PROVIDER_CACHE_CONNECT_TIMEOUT_SECONDS`
+- `OPEN_METEO_WEATHER_URL`
+- `OPEN_METEO_AIR_QUALITY_URL`
+- `NOMINATIM_REVERSE_URL`
+- `PUBLIC_DATA_USER_AGENT`
+
+## Persistent Provider Cache With Docker Postgres
+
+To keep provider snapshots warm across backend restarts, run the included Postgres service:
+
+```bash
+docker compose up -d postgres
+```
+
+Then set either:
+- `DATABASE_URL=postgresql://earth_twin:earth_twin@localhost:5432/earth_twin`
+
+or the standard component vars:
+- `POSTGRES_HOST=localhost`
+- `POSTGRES_PORT=5432`
+- `POSTGRES_DB=earth_twin`
+- `POSTGRES_USER=earth_twin`
+- `POSTGRES_PASSWORD=earth_twin`
+
+The backend creates the provider-cache table automatically on first use. If Postgres is not configured or unavailable, the app falls back to the current in-memory cache so local development still works.
+
+The same Postgres connection is also used for authenticated `My Projects` storage.
 
 ## Local Development
 
 ```bash
 cd earth-twin-backend
+docker compose up -d postgres
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -305,31 +358,18 @@ Local URLs:
 - Base URL: `http://127.0.0.1:8000`
 - Swagger docs: `http://127.0.0.1:8000/docs`
 
-## Project Layout
+## Limitations
 
-```text
-earth-twin-backend/
-  app/
-    api/v1/endpoints/
-    core/
-    data/
-    models/
-    repositories/
-    rules/
-    services/
-  tests/
-  render.yaml
-  Procfile
-  runtime.txt
-  requirements.txt
-  README.md
-```
+- Public-data fetches depend on upstream availability.
+- If a live provider is unavailable, the backend falls back to inferred baseline values so the API remains usable.
+- Provider responses are cached with a TTL so repeated location lookups are faster and less dependent on upstream latency.
+- If Postgres is configured, provider cache snapshots persist across restarts; otherwise the cache is in-memory only.
+- Not all metrics are truly real-time; some are latest-available public indicators or modeled derivatives.
+- The project-impact simulation is still rule-based, not a full scientific forecasting engine.
+- The world state remains in memory.
+- `My Projects` stores saved assessment snapshots, not the mutable world-state timeline.
 
-## Notes And Limitations
+## Verification
 
-- The world state is stored in memory only.
-- Restarting the service or calling `/api/v1/world/reset` restores the seed data.
-- This is a demo backend, not a persistent planning system.
-- Geometry is calculated internally from map points and is approximate.
-- The backend currently does not connect to real parcel GIS, road routing, or zoning APIs.
-- The raw simulation endpoints remain available, but the planner endpoints are the recommended product-facing integration path.
+Current test status:
+- `101 passed, 7 deselected`

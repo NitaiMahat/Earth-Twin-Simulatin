@@ -28,8 +28,7 @@ def get_build_options() -> PlanningBuildOptionsResponse:
 def resolve_geometry(payload: GeometryResolutionRequest) -> GeometryResolutionResponse:
     try:
         return planning_service.resolve_geometry(
-            site_id=payload.site_id,
-            area_id=payload.area_id,
+            location=payload.location,
             infrastructure_type=payload.infrastructure_type,
             geometry_points=payload.geometry_points,
             infrastructure_details=payload.infrastructure_details,
@@ -42,8 +41,7 @@ def resolve_geometry(payload: GeometryResolutionRequest) -> GeometryResolutionRe
 def assess_proposal(payload: ProposalAssessmentRequest) -> ProposalAssessmentResponse:
     try:
         return planning_service.assess_proposal(
-            site_id=payload.site_id,
-            area_id=payload.area_id,
+            location=payload.location,
             project_type=payload.project_type,
             infrastructure_type=payload.infrastructure_type,
             geometry_points=payload.geometry_points,

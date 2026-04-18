@@ -1,0 +1,65 @@
+[
+  {
+    "continent_id": "africa",
+    "zone_id": "continent_africa",
+    "name": "Africa",
+    "latitude": 1.65,
+    "longitude": 17.68,
+    "representative_country_code": "NGA",
+    "summary": "Continent-scale baseline for Africa using live public atmosphere data and latest public development indicators where available."
+  },
+  {
+    "continent_id": "antarctica",
+    "zone_id": "continent_antarctica",
+    "name": "Antarctica",
+    "latitude": -82.86,
+    "longitude": 135.0,
+    "representative_country_code": null,
+    "summary": "Continent-scale baseline for Antarctica using live public atmosphere data and polar fallback environmental assumptions where country indicators are unavailable."
+  },
+  {
+    "continent_id": "asia",
+    "zone_id": "continent_asia",
+    "name": "Asia",
+    "latitude": 34.05,
+    "longitude": 100.62,
+    "representative_country_code": "IND",
+    "summary": "Continent-scale baseline for Asia using live public atmosphere data and latest public development indicators where available."
+  },
+  {
+    "continent_id": "europe",
+    "zone_id": "continent_europe",
+    "name": "Europe",
+    "latitude": 54.53,
+    "longitude": 15.26,
+    "representative_country_code": "DEU",
+    "summary": "Continent-scale baseline for Europe using live public atmosphere data and latest public development indicators where available."
+  },
+  {
+    "continent_id": "north_america",
+    "zone_id": "continent_north_america",
+    "name": "North America",
+    "latitude": 54.53,
+    "longitude": -105.25,
+    "representative_country_code": "USA",
+    "summary": "Continent-scale baseline for North America using live public atmosphere data and latest public development indicators where available."
+  },
+  {
+    "continent_id": "oceania",
+    "zone_id": "continent_oceania",
+    "name": "Oceania",
+    "latitude": -25.27,
+    "longitude": 133.78,
+    "representative_country_code": "AUS",
+    "summary": "Continent-scale baseline for Oceania using live public atmosphere data and latest public development indicators where available."
+  },
+  {
+    "continent_id": "south_america",
+    "zone_id": "continent_south_america",
+    "name": "South America",
+    "latitude": -14.24,
+    "longitude": -51.93,
+    "representative_country_code": "BRA",
+    "summary": "Continent-scale baseline for South America using live public atmosphere data and latest public development indicators where available."
+  }
+]

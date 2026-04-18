@@ -10,6 +10,7 @@ from app.models.domain.planning import (
     MitigationCommitment,
     PlanVerdict,
     PlannerProjectType,
+    PlanningLocationContext,
 )
 from app.models.domain.scenario_template import ScenarioTemplateAction
 from app.models.domain.simulation import CompactZoneSummary
@@ -150,8 +151,8 @@ class CompareScenariosResponse(BaseModel):
     comparison_summary_text: str
 
 
-class PlanningAreaResponse(BaseModel):
-    area_id: str
+class PlanningContinentResponse(BaseModel):
+    continent_id: str
     name: str
     baseline_zone_id: str
     current_risk_level: str
@@ -164,7 +165,7 @@ class PlanningSiteResponse(BaseModel):
     name: str
     state: str
     summary: str
-    areas: list[PlanningAreaResponse]
+    continents: list[PlanningContinentResponse]
     build_sections: list[BuildSectionDefinition]
 
 
@@ -183,9 +184,21 @@ class GeometryLocationSummaryResponse(BaseModel):
     area_sq_m: float | None
 
 
+class PlanningLocationContextResponse(BaseModel):
+    label: str
+    latitude: float
+    longitude: float
+    continent_id: str
+    continent_name: str
+    baseline_zone_id: str
+    country_code: str | None = None
+    country_name: str | None = None
+    state_name: str | None = None
+    source_summary: str
+
+
 class GeometryResolutionResponse(BaseModel):
-    site_id: str
-    area_id: str
+    location_context: PlanningLocationContextResponse
     infrastructure_type: InfrastructureCategory
     resolved_project_type: PlannerProjectType
     geometry_summary: GeometryLocationSummaryResponse
@@ -203,9 +216,11 @@ class PlannerSimulationActionResponse(BaseModel):
 class PlannerSimulationInputsResponse(BaseModel):
     projection_years: int
     baseline_zone_id: str
+    continent_id: str
     footprint_bucket: str
     traffic_bucket: str
     resolved_project_type: PlannerProjectType
+    location_context: PlanningLocationContextResponse
     infrastructure_type: InfrastructureCategory | None
     geometry_summary: GeometryLocationSummaryResponse | None
     infrastructure_details: dict[str, str | int | float | bool]
@@ -224,8 +239,8 @@ class PlanScorecardResponse(BaseModel):
 
 
 class ProposalAssessmentResponse(BaseModel):
-    site_id: str
-    area_id: str
+    location_context: PlanningLocationContextResponse
+    continent_id: str
     project_type: PlannerProjectType
     infrastructure_type: InfrastructureCategory | None
     geometry_summary: GeometryLocationSummaryResponse | None
@@ -256,3 +271,44 @@ class GoalToActionsResponse(BaseModel):
 
 class SuggestImprovementsResponse(BaseModel):
     analysis: str
+
+
+class AuthMeResponse(BaseModel):
+    user_id: str
+    email: str | None = None
+    role: str
+    org_id: str | None = None
+
+
+class ProjectReportMetadataResponse(BaseModel):
+    ai_analysis: str | None = None
+    pdf_url: str | None = None
+    pdf_filename: str | None = None
+    updated_at: str | None = None
+
+
+class SavedProjectSummaryResponse(BaseModel):
+    project_id: str
+    project_name: str
+    created_at: str
+    updated_at: str
+    continent_id: str
+    project_type: PlannerProjectType
+    infrastructure_type: InfrastructureCategory | None
+    location_label: str
+    recommended_option: str
+    latest_report: ProjectReportMetadataResponse
+
+
+class SavedProjectDetailResponse(BaseModel):
+    project_id: str
+    project_name: str
+    created_at: str
+    updated_at: str
+    assessment: ProposalAssessmentResponse
+    latest_report: ProjectReportMetadataResponse
+
+
+class SavedProjectListResponse(BaseModel):
+    projects: list[SavedProjectSummaryResponse]
+    count: int

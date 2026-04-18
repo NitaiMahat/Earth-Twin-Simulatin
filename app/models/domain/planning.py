@@ -59,6 +59,13 @@ class GeometryPoint(BaseModel):
     longitude: float
 
 
+class PlanningLocationInput(BaseModel):
+    latitude: float
+    longitude: float
+    label: str | None = None
+    country_code: str | None = None
+
+
 class MapToolDefinition(BaseModel):
     selection_mode: GeometrySelectionMode
     min_points: int
@@ -90,3 +97,16 @@ class PlanningSiteDefinition(BaseModel):
     state: str
     summary: str
     areas: list[PlanningAreaDefinition]
+
+
+class PlanningLocationContext(BaseModel):
+    label: str
+    latitude: float
+    longitude: float
+    continent_id: str
+    continent_name: str
+    baseline_zone_id: str
+    country_code: str | None = None
+    country_name: str | None = None
+    state_name: str | None = None
+    source_summary: str

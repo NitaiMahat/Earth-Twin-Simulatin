@@ -16,6 +16,6 @@ def get_world() -> WorldStateResponse:
 @router.post("/reset", response_model=WorldResetResponse)
 def reset_world() -> WorldResetResponse:
     return WorldResetResponse(
-        message="World state reset from seed data.",
+        message="World state refreshed from public baseline data.",
         world=world_service.reset_world(),
     )

@@ -62,8 +62,9 @@ class SimulationEngine:
         base_world_id: str,
         actions: list[SimulationAction],
         projection_years: int,
+        base_world_override: WorldState | None = None,
     ) -> tuple[WorldState, WorldState, ProjectionMetrics]:
-        base_world = world_repository.get_world()
+        base_world = base_world_override.model_copy(deep=True) if base_world_override is not None else world_repository.get_world()
         impact_service.refresh_world(base_world)
 
         if base_world.world_id != base_world_id:
@@ -96,8 +97,14 @@ class SimulationEngine:
         base_world_id: str,
         actions: list[SimulationAction],
         projection_years: int,
+        base_world_override: WorldState | None = None,
     ) -> tuple[WorldState, str, ZoneState | None, float, float]:
-        _, projected_world, metrics = self._simulate_projection(base_world_id, actions, projection_years)
+        _, projected_world, metrics = self._simulate_projection(
+            base_world_id,
+            actions,
+            projection_years,
+            base_world_override=base_world_override,
+        )
         summary = impact_service.build_projection_summary(projected_world, metrics)
 
         return (
@@ -114,8 +121,14 @@ class SimulationEngine:
         actions: list[SimulationAction],
         projection_years: int,
         mode: SimulationMode,
+        base_world_override: WorldState | None = None,
     ) -> ProjectionSimulationResult:
-        _, projected_world, metrics = self._simulate_projection(base_world_id, actions, projection_years)
+        _, projected_world, metrics = self._simulate_projection(
+            base_world_id,
+            actions,
+            projection_years,
+            base_world_override=base_world_override,
+        )
         overall_outlook = impact_service.build_overall_outlook(projected_world)
         summary = impact_service.build_projection_headline(projected_world, mode, overall_outlook)
         summary_text = impact_service.build_projection_summary(projected_world, metrics, mode)
@@ -167,6 +180,7 @@ class SimulationEngine:
         projection_years: int,
         mode: SimulationMode,
         scenarios: list[tuple[str, list[SimulationAction]]],
+        base_world_override: WorldState | None = None,
     ) -> ComparisonSimulationResult:
         compared_scenarios: list[ComparedScenarioResult] = []
 
@@ -176,6 +190,7 @@ class SimulationEngine:
                 actions=actions,
                 projection_years=projection_years,
                 mode=mode,
+                base_world_override=base_world_override,
             )
             compared_scenarios.append(
                 ComparedScenarioResult(
