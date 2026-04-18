@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import json
 import math
 from typing import Any
 
-from app.core.config import settings
 from app.core.constants import RiskLevel
 from app.models.api.responses import (
     GeometryLocationSummaryResponse,
+    PlanningLocationContextResponse,
     GeometryResolutionResponse,
     PlanScorecardResponse,
     PlanningBuildOptionsResponse,
     PlannerSimulationActionResponse,
     PlannerSimulationInputsResponse,
-    PlanningAreaResponse,
+    PlanningContinentResponse,
     PlanningSiteResponse,
     ProposalAssessmentResponse,
 )
@@ -27,34 +26,35 @@ from app.models.domain.planning import (
     MitigationCommitment,
     MapToolDefinition,
     PlanningFieldType,
-    PlanningAreaDefinition,
-    PlanningSiteDefinition,
     PlanVerdict,
     PlannerProjectType,
+    PlanningLocationContext,
+    PlanningLocationInput,
 )
 from app.models.domain.simulation import ProjectionSimulationResult
 from app.models.domain.zone import ZoneState
 from app.services.action_mapper import action_mapper
 from app.services.impact_service import impact_service
+from app.services.public_baseline_service import GLOBAL_WORLD_ID, public_baseline_service
 from app.services.simulation_engine import simulation_engine
 from app.services.world_service import world_service
 
 
-SITE_ID = "illinois_calumet_corridor_demo"
+SITE_ID = "global_location_planner"
 DEFAULT_PROJECTION_YEARS = 5
 SUBMITTED_SCENARIO_NAME = "Submitted Plan"
 MITIGATED_SCENARIO_NAME = "Mitigated Plan"
-
-RESTORATION_ACTION_BY_AREA = {
-    "calumet_industrial_strip": "add_urban_park",
-    "arterial_infill_corridor": "improve_public_transit",
-    "river_buffer_redevelopment": "restoration_corridor",
-}
 
 PROJECT_ACTION_MAPPING = {
     PlannerProjectType.INDUSTRIAL_FACILITY: ("industrial_expansion", "expand_roadway"),
     PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION: ("expand_roadway", "industrial_expansion"),
     PlannerProjectType.MIXED_USE_REDEVELOPMENT: ("expand_roadway", "reduce_green_space"),
+}
+
+RESTORATION_ACTION_BY_PROJECT = {
+    PlannerProjectType.INDUSTRIAL_FACILITY: "add_urban_park",
+    PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION: "improve_public_transit",
+    PlannerProjectType.MIXED_USE_REDEVELOPMENT: "restoration_corridor",
 }
 
 ACTION_LABELS = {
@@ -453,31 +453,8 @@ BUILD_SECTIONS = [
 
 
 class PlanningService:
-    def __init__(self) -> None:
-        self._site = self._load_site()
-
-    def _load_site(self) -> PlanningSiteDefinition:
-        with settings.planning_site_path.open("r", encoding="utf-8") as planning_file:
-            payload = json.load(planning_file)
-        return PlanningSiteDefinition.model_validate(payload)
-
-    def _get_area(self, area_id: str) -> PlanningAreaDefinition:
-        for area in self._site.areas:
-            if area.area_id == area_id:
-                return area
-        raise ValueError(f"Unknown area_id '{area_id}'.")
-
-    def _validate_site(self, site_id: str) -> None:
-        if site_id != self._site.site_id:
-            raise ValueError(f"Unknown site_id '{site_id}'. Expected '{self._site.site_id}'.")
-
-    def _validate_project_type(self, area: PlanningAreaDefinition, project_type: PlannerProjectType) -> None:
-        if project_type not in area.allowed_project_types:
-            allowed_types = ", ".join(project_type.value for project_type in area.allowed_project_types)
-            raise ValueError(
-                f"Project type '{project_type.value}' is not allowed for area '{area.area_id}'. "
-                f"Allowed values: {allowed_types}."
-            )
+    def _location_context_response(self, context: PlanningLocationContext) -> PlanningLocationContextResponse:
+        return PlanningLocationContextResponse.model_validate(context.model_dump())
 
     def _find_zone(self, zone_id: str) -> ZoneState:
         world = world_service.get_world()
@@ -487,7 +464,10 @@ class PlanningService:
         raise ValueError(f"Zone '{zone_id}' was not found.")
 
     def get_build_options(self) -> PlanningBuildOptionsResponse:
-        return PlanningBuildOptionsResponse(site_id=self._site.site_id, sections=BUILD_SECTIONS)
+        return PlanningBuildOptionsResponse(site_id=SITE_ID, sections=BUILD_SECTIONS)
+
+    def get_build_section_definition(self, infrastructure_type: InfrastructureCategory) -> BuildSectionDefinition:
+        return self._get_build_section(infrastructure_type)
 
     def _get_build_section(self, infrastructure_type: InfrastructureCategory) -> BuildSectionDefinition:
         for section in BUILD_SECTIONS:
@@ -618,14 +598,12 @@ class PlanningService:
 
     def resolve_geometry(
         self,
-        site_id: str,
-        area_id: str,
+        location: PlanningLocationInput,
         infrastructure_type: InfrastructureCategory,
         geometry_points: list[GeometryPoint],
         infrastructure_details: dict[str, Any] | None = None,
     ) -> GeometryResolutionResponse:
-        self._validate_site(site_id)
-        self._get_area(area_id)
+        location_context = public_baseline_service.build_location_context(location)
         geometry_summary = self._build_geometry_summary(infrastructure_type, geometry_points)
         merged_details = self._merge_geometry_into_details(
             infrastructure_type=infrastructure_type,
@@ -635,12 +613,30 @@ class PlanningService:
         normalized_details = self._validate_infrastructure_details(infrastructure_type, merged_details)
 
         return GeometryResolutionResponse(
-            site_id=site_id,
-            area_id=area_id,
+            location_context=self._location_context_response(location_context),
             infrastructure_type=infrastructure_type,
             resolved_project_type=INFRASTRUCTURE_TO_PROJECT_TYPE[infrastructure_type],
             geometry_summary=geometry_summary,
             resolved_infrastructure_details=normalized_details,
+        )
+
+    def build_geometry_summary(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        geometry_points: list[GeometryPoint],
+    ) -> GeometryLocationSummaryResponse:
+        return self._build_geometry_summary(infrastructure_type, geometry_points)
+
+    def merge_geometry_details(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+        geometry_summary: GeometryLocationSummaryResponse | None,
+    ) -> dict[str, Any]:
+        return self._merge_geometry_into_details(
+            infrastructure_type=infrastructure_type,
+            infrastructure_details=infrastructure_details,
+            geometry_summary=geometry_summary,
         )
 
     def _coerce_numeric_value(self, value: Any, field_name: str) -> float:
@@ -725,27 +721,38 @@ class PlanningService:
         buildout_years = int(details.get("construction_years", DEFAULT_BUILDOUT_YEARS[infrastructure_type]))
         return project_type, details, footprint_acres, traffic, buildout_years
 
+    def resolve_infrastructure_inputs(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+    ) -> tuple[PlannerProjectType, dict[str, str | int | float | bool], float, int, int]:
+        return self._resolve_infrastructure_inputs(infrastructure_type, infrastructure_details)
+
     def get_site(self) -> PlanningSiteResponse:
-        areas = []
-        for area in self._site.areas:
-            zone = self._find_zone(area.baseline_zone_id)
-            areas.append(
-                PlanningAreaResponse(
-                    area_id=area.area_id,
-                    name=area.name,
-                    baseline_zone_id=area.baseline_zone_id,
+        continents = []
+        for continent in public_baseline_service.list_continents():
+            zone = self._find_zone(continent.zone_id)
+            continents.append(
+                PlanningContinentResponse(
+                    continent_id=continent.continent_id,
+                    name=continent.name,
+                    baseline_zone_id=continent.zone_id,
                     current_risk_level=zone.risk_level.value,
-                    planning_notes=area.planning_notes,
-                    allowed_project_types=area.allowed_project_types,
+                    planning_notes=continent.summary,
+                    allowed_project_types=list(PlannerProjectType),
                 )
             )
 
         return PlanningSiteResponse(
-            site_id=self._site.site_id,
-            name=self._site.name,
-            state=self._site.state,
-            summary=self._site.summary,
-            areas=areas,
+            site_id=SITE_ID,
+            name="Global Location Planner",
+            state="Global",
+            summary=(
+                "Location-first planner for real-world coordinates. Choose anywhere on Earth, resolve the "
+                "continent context, bring in live public baseline data, and simulate infrastructure impact "
+                "from that current baseline instead of a preset demo parcel."
+            ),
+            continents=continents,
             build_sections=BUILD_SECTIONS,
         )
 
@@ -780,7 +787,7 @@ class PlanningService:
 
     def _build_actions(
         self,
-        area: PlanningAreaDefinition,
+        baseline_zone_id: str,
         project_type: PlannerProjectType,
         buildout_years: int,
         footprint_intensity: float,
@@ -790,26 +797,26 @@ class PlanningService:
         primary_action, secondary_action = PROJECT_ACTION_MAPPING[project_type]
         actions: list[dict[str, object]] = [
             {
-                "zone_id": area.baseline_zone_id,
+                "zone_id": baseline_zone_id,
                 "requested_action_type": primary_action,
                 "intensity": footprint_intensity,
                 "duration_years": buildout_years,
             },
             {
-                "zone_id": area.baseline_zone_id,
+                "zone_id": baseline_zone_id,
                 "requested_action_type": secondary_action,
                 "intensity": traffic_intensity,
                 "duration_years": buildout_years,
             },
         ]
 
-        restoration_action = RESTORATION_ACTION_BY_AREA[area.area_id]
+        restoration_action = RESTORATION_ACTION_BY_PROJECT[project_type]
         mitigation_duration = min(buildout_years, DEFAULT_PROJECTION_YEARS)
 
         if mitigation_commitment in {MitigationCommitment.MEDIUM, MitigationCommitment.HIGH}:
             actions.append(
                 {
-                    "zone_id": area.baseline_zone_id,
+                    "zone_id": baseline_zone_id,
                     "requested_action_type": restoration_action,
                     "intensity": 0.6 if mitigation_commitment == MitigationCommitment.MEDIUM else 0.85,
                     "duration_years": mitigation_duration,
@@ -819,7 +826,7 @@ class PlanningService:
         if mitigation_commitment == MitigationCommitment.HIGH:
             actions.append(
                 {
-                    "zone_id": area.baseline_zone_id,
+                    "zone_id": baseline_zone_id,
                     "requested_action_type": "improve_public_transit",
                     "intensity": 0.6,
                     "duration_years": mitigation_duration,
@@ -864,7 +871,7 @@ class PlanningService:
 
     def _build_required_mitigations(
         self,
-        area: PlanningAreaDefinition,
+        project_type: PlannerProjectType,
         projection: ProjectionSimulationResult,
         action_inputs: list[dict[str, object]],
     ) -> list[str]:
@@ -878,7 +885,7 @@ class PlanningService:
                 if mitigation and mitigation not in required_mitigations:
                     required_mitigations.append(mitigation)
 
-        restoration_action = RESTORATION_ACTION_BY_AREA[area.area_id]
+        restoration_action = RESTORATION_ACTION_BY_PROJECT[project_type]
         if restoration_action not in action_types:
             required_mitigations.append(f"Add {ACTION_LABELS[restoration_action]} as a condition of approval.")
         if "improve_public_transit" not in action_types:
@@ -893,7 +900,7 @@ class PlanningService:
 
     def _build_scorecard(
         self,
-        area: PlanningAreaDefinition,
+        project_type: PlannerProjectType,
         projection: ProjectionSimulationResult,
         action_inputs: list[dict[str, object]],
     ) -> PlanScorecardResponse:
@@ -903,14 +910,13 @@ class PlanningService:
             overall_outlook=projection.overall_outlook,
             highest_risk_zone=impact_service.build_compact_zone_summary(projection.highest_risk_zone),
             top_risks=projection.highest_risk_zone_top_drivers or ["No concentrated high-risk drivers were detected."],
-            required_mitigations=self._build_required_mitigations(area, projection, action_inputs),
+            required_mitigations=self._build_required_mitigations(project_type, projection, action_inputs),
             summary_text=projection.summary_text,
         )
 
     def assess_proposal(
         self,
-        site_id: str,
-        area_id: str,
+        location: PlanningLocationInput,
         project_type: PlannerProjectType | None,
         infrastructure_type: InfrastructureCategory | None,
         geometry_points: list[GeometryPoint] | None,
@@ -921,16 +927,14 @@ class PlanningService:
         mitigation_commitment: MitigationCommitment,
         planner_notes: str | None = None,
     ) -> ProposalAssessmentResponse:
-        self._validate_site(site_id)
-        area = self._get_area(area_id)
+        location_context, location_zone = public_baseline_service.build_location_zone(location)
 
         normalized_infrastructure_details: dict[str, str | int | float | bool] = {}
         geometry_summary: GeometryLocationSummaryResponse | None = None
         if infrastructure_type is not None:
             if geometry_points:
                 geometry_resolution = self.resolve_geometry(
-                    site_id=site_id,
-                    area_id=area_id,
+                    location=location,
                     infrastructure_type=infrastructure_type,
                     geometry_points=geometry_points,
                     infrastructure_details=infrastructure_details or {},
@@ -958,15 +962,19 @@ class PlanningService:
             resolved_estimated_daily_vehicle_trips = estimated_daily_vehicle_trips
             resolved_buildout_years = buildout_years
 
-        self._validate_project_type(area, resolved_project_type)
-
         world = world_service.get_world()
+        baseline_world = world.model_copy(deep=True)
+        for index, zone in enumerate(baseline_world.zones):
+            if zone.zone_id == location_context.baseline_zone_id:
+                baseline_world.zones[index] = location_zone
+                break
+
         footprint_bucket, footprint_intensity = self._bucket_footprint(resolved_footprint_acres)
         traffic_bucket, traffic_intensity = self._bucket_traffic(resolved_estimated_daily_vehicle_trips)
 
         submitted_action_inputs, submitted_simulation_actions = self._normalize_actions(
             self._build_actions(
-                area=area,
+                baseline_zone_id=location_context.baseline_zone_id,
                 project_type=resolved_project_type,
                 buildout_years=resolved_buildout_years,
                 footprint_intensity=footprint_intensity,
@@ -976,7 +984,7 @@ class PlanningService:
         )
         mitigated_action_inputs, mitigated_simulation_actions = self._normalize_actions(
             self._build_actions(
-                area=area,
+                baseline_zone_id=location_context.baseline_zone_id,
                 project_type=resolved_project_type,
                 buildout_years=resolved_buildout_years,
                 footprint_intensity=footprint_intensity,
@@ -990,12 +998,14 @@ class PlanningService:
             actions=submitted_simulation_actions,
             projection_years=DEFAULT_PROJECTION_YEARS,
             mode=SimulationMode.PLANNING,
+            base_world_override=baseline_world,
         )
         mitigated_projection = simulation_engine.project_world_result(
             base_world_id=world.world_id,
             actions=mitigated_simulation_actions,
             projection_years=DEFAULT_PROJECTION_YEARS,
             mode=SimulationMode.PLANNING,
+            base_world_override=baseline_world,
         )
         comparison = simulation_engine.compare_scenarios(
             base_world_id=world.world_id,
@@ -1005,6 +1015,7 @@ class PlanningService:
                 (SUBMITTED_SCENARIO_NAME, submitted_simulation_actions),
                 (MITIGATED_SCENARIO_NAME, mitigated_simulation_actions),
             ],
+            base_world_override=baseline_world,
         )
 
         recommended_option = (
@@ -1015,8 +1026,8 @@ class PlanningService:
             comparison_summary = f"{comparison_summary} {comparison.key_tradeoffs[0]}"
 
         return ProposalAssessmentResponse(
-            site_id=site_id,
-            area_id=area_id,
+            location_context=self._location_context_response(location_context),
+            continent_id=location_context.continent_id,
             project_type=resolved_project_type,
             infrastructure_type=infrastructure_type,
             geometry_summary=geometry_summary,
@@ -1026,16 +1037,18 @@ class PlanningService:
             buildout_years=resolved_buildout_years,
             mitigation_commitment=mitigation_commitment,
             planner_notes=planner_notes,
-            submitted_plan=self._build_scorecard(area, submitted_projection, submitted_action_inputs),
-            mitigated_plan=self._build_scorecard(area, mitigated_projection, mitigated_action_inputs),
+            submitted_plan=self._build_scorecard(resolved_project_type, submitted_projection, submitted_action_inputs),
+            mitigated_plan=self._build_scorecard(resolved_project_type, mitigated_projection, mitigated_action_inputs),
             recommended_option=recommended_option,
             comparison_summary=comparison_summary,
             simulation_inputs=PlannerSimulationInputsResponse(
                 projection_years=DEFAULT_PROJECTION_YEARS,
-                baseline_zone_id=area.baseline_zone_id,
+                baseline_zone_id=location_context.baseline_zone_id,
+                continent_id=location_context.continent_id,
                 footprint_bucket=footprint_bucket,
                 traffic_bucket=traffic_bucket,
                 resolved_project_type=resolved_project_type,
+                location_context=self._location_context_response(location_context),
                 infrastructure_type=infrastructure_type,
                 geometry_summary=geometry_summary,
                 infrastructure_details=normalized_infrastructure_details,

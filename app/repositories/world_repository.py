@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import json
-
-from app.core.config import settings
 from app.models.domain.world import WorldState
+from app.services.public_baseline_service import public_baseline_service
 
 
 class WorldRepository:
     def __init__(self) -> None:
-        self._world = self._load_seed_world()
+        self._world = self._load_world()
 
-    def _load_seed_world(self) -> WorldState:
-        with settings.seed_world_path.open("r", encoding="utf-8") as seed_file:
-            payload = json.load(seed_file)
-        return WorldState.model_validate(payload)
+    def _load_world(self) -> WorldState:
+        return public_baseline_service.build_world()
 
     def get_world(self) -> WorldState:
         return self._world
@@ -23,7 +19,7 @@ class WorldRepository:
         return self._world
 
     def reset_world(self) -> WorldState:
-        self._world = self._load_seed_world()
+        self._world = self._load_world()
         return self._world
 
 

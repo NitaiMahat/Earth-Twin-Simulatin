@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: earth-twin-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: earth_twin
+      POSTGRES_USER: earth_twin
+      POSTGRES_PASSWORD: earth_twin
+    ports:
+      - "5432:5432"
+    volumes:
+      - earth_twin_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U earth_twin -d earth_twin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  earth_twin_postgres_data:

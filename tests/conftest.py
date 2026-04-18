@@ -14,21 +14,21 @@ from app.main import app
 
 _client = TestClient(app)
 
-_ZONE_ID = "zone_calumet_industrial_strip"
+_ZONE_ID = "continent_asia"
 _GOAL = "Reduce pollution but keep traffic flowing"
 
 _INITIAL_METRICS = {
     "zone_id": _ZONE_ID,
-    "name": "Calumet Industrial Strip",
-    "type": "industrial",
-    "tree_cover": 8.0,
-    "biodiversity_score": 31.0,
-    "pollution_level": 73.0,
-    "traffic_level": 61.0,
-    "temperature": 29.3,
-    "ecosystem_health": 34.0,
-    "risk_level": "critical",
-    "sustainability_score": 22.5,
+    "name": "Asia",
+    "type": "continent",
+    "tree_cover": 28.0,
+    "biodiversity_score": 46.0,
+    "pollution_level": 62.0,
+    "traffic_level": 68.0,
+    "temperature": 26.8,
+    "ecosystem_health": 43.0,
+    "risk_level": "high",
+    "sustainability_score": 34.5,
 }
 
 
@@ -51,7 +51,7 @@ def simulation_result(gemini_actions: list[dict]) -> dict:
     resp = _client.post(
         "/api/v1/simulation/project",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "mode": "planning",
             "actions": [
@@ -89,7 +89,7 @@ def gemini_analysis(gemini_actions: list[dict], projected_zone: dict,
         json={
             "goal": _GOAL,
             "zone_id": _ZONE_ID,
-            "zone_name": "Calumet Industrial Strip",
+            "zone_name": "Asia",
             "actions": gemini_actions,
             "initial_metrics": _INITIAL_METRICS,
             "final_metrics": projected_zone,

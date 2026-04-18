@@ -16,7 +16,7 @@ def test_compare_endpoint_returns_recommendation_and_tradeoffs() -> None:
     response = client.post(
         "/api/v1/simulation/compare",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "mode": "planning",
             "scenarios": [
@@ -24,7 +24,7 @@ def test_compare_endpoint_returns_recommendation_and_tradeoffs() -> None:
                     "name": "Road Expansion",
                     "actions": [
                         {
-                            "zone_id": "zone_arterial_infill_corridor",
+                            "zone_id": "continent_north_america",
                             "action_type": "expand_roadway",
                             "intensity": 0.8,
                             "duration_years": 3,
@@ -35,13 +35,13 @@ def test_compare_endpoint_returns_recommendation_and_tradeoffs() -> None:
                     "name": "Transit + Parks",
                     "actions": [
                         {
-                            "zone_id": "zone_arterial_infill_corridor",
+                            "zone_id": "continent_north_america",
                             "action_type": "improve_public_transit",
                             "intensity": 0.8,
                             "duration_years": 3,
                         },
                         {
-                            "zone_id": "zone_arterial_infill_corridor",
+                            "zone_id": "continent_north_america",
                             "action_type": "add_urban_park",
                             "intensity": 0.5,
                             "duration_years": 2,
@@ -67,9 +67,9 @@ def test_compare_endpoint_returns_recommendation_and_tradeoffs() -> None:
     assert current_world["current_year"] == base_world["current_year"]
     assert current_world["sustainability_score"] == base_world["sustainability_score"]
     current_city = next(
-        zone for zone in current_world["zones"] if zone["zone_id"] == "zone_arterial_infill_corridor"
+        zone for zone in current_world["zones"] if zone["zone_id"] == "continent_north_america"
     )
-    base_city = next(zone for zone in base_world["zones"] if zone["zone_id"] == "zone_arterial_infill_corridor")
+    base_city = next(zone for zone in base_world["zones"] if zone["zone_id"] == "continent_north_america")
     assert current_city["traffic_level"] == base_city["traffic_level"]
 
 
@@ -78,14 +78,14 @@ def test_compare_rejects_unsupported_action_type() -> None:
     response = client.post(
         "/api/v1/simulation/compare",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "scenarios": [
                 {
                     "name": "Bad A",
                     "actions": [
                         {
-                            "zone_id": "zone_arterial_infill_corridor",
+                            "zone_id": "continent_north_america",
                             "action_type": "volcano_mode",
                             "intensity": 0.8,
                             "duration_years": 3,
@@ -96,7 +96,7 @@ def test_compare_rejects_unsupported_action_type() -> None:
                     "name": "Bad B",
                     "actions": [
                         {
-                            "zone_id": "zone_arterial_infill_corridor",
+                            "zone_id": "continent_north_america",
                             "action_type": "expand_roadway",
                             "intensity": 0.8,
                             "duration_years": 3,

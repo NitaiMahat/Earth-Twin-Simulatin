@@ -11,7 +11,7 @@ def test_apply_action_returns_frontend_friendly_before_and_after_payload() -> No
     response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "deforestation",
             "intensity": 0.5,
             "duration_years": 2,
@@ -20,7 +20,7 @@ def test_apply_action_returns_frontend_friendly_before_and_after_payload() -> No
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["zone_id"] == "zone_calumet_habitat_reserve"
+    assert payload["zone_id"] == "continent_south_america"
     assert payload["requested_action_type"] == "deforestation"
     assert payload["normalized_action_type"] == "deforestation"
     assert payload["mode"] == "planning"
@@ -41,12 +41,12 @@ def test_apply_action_returns_frontend_friendly_before_and_after_payload() -> No
 
 def test_apply_action_mutates_current_in_memory_world_state() -> None:
     client.post("/api/v1/world/reset")
-    before_zone = client.get("/api/v1/zones/zone_arterial_infill_corridor").json()["zone"]
+    before_zone = client.get("/api/v1/zones/continent_north_america").json()["zone"]
 
     apply_response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_arterial_infill_corridor",
+            "zone_id": "continent_north_america",
             "action_type": "traffic_increase",
             "intensity": 0.8,
             "duration_years": 2,
@@ -55,7 +55,7 @@ def test_apply_action_mutates_current_in_memory_world_state() -> None:
 
     assert apply_response.status_code == 200
 
-    after_zone = client.get("/api/v1/zones/zone_arterial_infill_corridor").json()["zone"]
+    after_zone = client.get("/api/v1/zones/continent_north_america").json()["zone"]
     assert after_zone["traffic_level"] > before_zone["traffic_level"]
     assert after_zone["pollution_level"] > before_zone["pollution_level"]
 
@@ -65,7 +65,7 @@ def test_apply_action_rejects_unsupported_action_type() -> None:
     response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "volcano_mode",
             "intensity": 0.5,
             "duration_years": 2,
@@ -80,7 +80,7 @@ def test_apply_action_validates_intensity_range() -> None:
     response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "deforestation",
             "intensity": 1.5,
             "duration_years": 2,
@@ -95,7 +95,7 @@ def test_apply_action_validates_duration_years_range() -> None:
     response = client.post(
         "/api/v1/simulation/apply",
         json={
-            "zone_id": "zone_calumet_habitat_reserve",
+            "zone_id": "continent_south_america",
             "action_type": "deforestation",
             "intensity": 0.5,
             "duration_years": 0,
@@ -128,18 +128,18 @@ def test_project_future_returns_projection_summary_without_mutating_live_world()
     response = client.post(
         "/api/v1/simulation/project",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "mode": "learning",
             "actions": [
                 {
-                    "zone_id": "zone_river_buffer_redevelopment",
+                    "zone_id": "continent_oceania",
                     "action_type": "pollution_spike",
                     "intensity": 0.8,
                     "duration_years": 3,
                 },
                 {
-                    "zone_id": "zone_calumet_habitat_reserve",
+                    "zone_id": "continent_south_america",
                     "action_type": "restoration",
                     "intensity": 0.4,
                     "duration_years": 2,
@@ -154,7 +154,7 @@ def test_project_future_returns_projection_summary_without_mutating_live_world()
     assert payload["mode"] == "learning"
     assert isinstance(payload["summary"], str)
     assert isinstance(payload["summary_text"], str)
-    assert len(payload["projected_zones"]) == 4
+    assert len(payload["projected_zones"]) == 7
     assert payload["highest_risk_zone"] is not None
     assert "avg_biodiversity_drop" in payload
     assert "avg_temperature_change" in payload
@@ -167,9 +167,9 @@ def test_project_future_returns_projection_summary_without_mutating_live_world()
     assert current_world["current_year"] == base_world["current_year"]
 
     current_coastal = next(
-        zone for zone in current_world["zones"] if zone["zone_id"] == "zone_river_buffer_redevelopment"
+        zone for zone in current_world["zones"] if zone["zone_id"] == "continent_oceania"
     )
-    base_coastal = next(zone for zone in base_world["zones"] if zone["zone_id"] == "zone_river_buffer_redevelopment")
+    base_coastal = next(zone for zone in base_world["zones"] if zone["zone_id"] == "continent_oceania")
     assert current_coastal["pollution_level"] == base_coastal["pollution_level"]
 
 
@@ -193,11 +193,11 @@ def test_project_future_validates_action_shape() -> None:
     response = client.post(
         "/api/v1/simulation/project",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "actions": [
                 {
-                    "zone_id": "zone_river_buffer_redevelopment",
+                    "zone_id": "continent_oceania",
                     "action_type": "pollution_spike",
                     "intensity": 1.4,
                     "duration_years": 3,
@@ -214,11 +214,11 @@ def test_project_future_accepts_product_facing_action_types() -> None:
     response = client.post(
         "/api/v1/simulation/project",
         json={
-            "base_world_id": "illinois_calumet_corridor_demo",
+            "base_world_id": "global_continental_baseline",
             "projection_years": 5,
             "actions": [
                 {
-                    "zone_id": "zone_arterial_infill_corridor",
+                    "zone_id": "continent_north_america",
                     "action_type": "improve_public_transit",
                     "intensity": 0.8,
                     "duration_years": 3,

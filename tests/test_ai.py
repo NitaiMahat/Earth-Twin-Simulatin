@@ -11,9 +11,9 @@ def test_ai_explain_returns_planning_friendly_explanation() -> None:
     response = client.post(
         "/api/v1/ai/explain",
         json={
-            "zone_id": "zone_calumet_industrial_strip",
-            "context": "Investor demo scenario after several pollution events.",
-            "question": "Why is this zone struggling?",
+            "zone_id": "continent_asia",
+            "context": "Global infrastructure planning context after several pollution events.",
+            "question": "Why is this continent under pressure?",
             "mode": "planning",
             "audience": "municipality",
         },
@@ -21,7 +21,7 @@ def test_ai_explain_returns_planning_friendly_explanation() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert "Calumet Industrial Strip" in payload["answer"]
+    assert "Asia" in payload["answer"]
     assert "sustainability score" in payload["answer"].lower()
     assert 3 <= len(payload["bullets"]) <= 5
     assert 2 <= len(payload["recommended_actions"]) <= 4
@@ -36,8 +36,8 @@ def test_ai_explain_returns_learning_friendly_explanation_with_default_audience(
     response = client.post(
         "/api/v1/ai/explain",
         json={
-            "zone_id": "zone_arterial_infill_corridor",
-            "context": "Traffic increased after a major construction project.",
+            "zone_id": "continent_north_america",
+            "context": "Traffic and emissions increased after a major infrastructure expansion.",
             "question": "What is likely driving the current risk?",
             "mode": "learning",
         },
@@ -59,8 +59,8 @@ def test_ai_explain_rejects_unknown_zone_id() -> None:
         "/api/v1/ai/explain",
         json={
             "zone_id": "zone_missing",
-            "context": "Pitch demo context.",
-            "question": "Why is this zone at risk?",
+            "context": "Global planning context.",
+            "question": "Why is this continent at risk?",
         },
     )
 

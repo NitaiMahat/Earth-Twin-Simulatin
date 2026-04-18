@@ -28,20 +28,20 @@ _SKIP_NO_KEY = pytest.mark.skipif(not _HAS_KEY, reason="GEMINI_API_KEY not set")
 _SKIP_HAS_KEY = pytest.mark.skipif(_HAS_KEY, reason="GEMINI_API_KEY is set — error-path test irrelevant")
 _LIVE = pytest.mark.live_gemini  # combined marker applied to all live-API tests
 
-ZONE_ID = "zone_calumet_industrial_strip"
+ZONE_ID = "continent_asia"
 
 INITIAL_METRICS = {
     "zone_id": ZONE_ID,
-    "name": "Calumet Industrial Strip",
-    "type": "industrial",
-    "tree_cover": 8.0,
-    "biodiversity_score": 31.0,
-    "pollution_level": 73.0,
-    "traffic_level": 61.0,
-    "temperature": 29.3,
-    "ecosystem_health": 34.0,
-    "risk_level": "critical",
-    "sustainability_score": 22.5,
+    "name": "Asia",
+    "type": "continent",
+    "tree_cover": 28.0,
+    "biodiversity_score": 46.0,
+    "pollution_level": 62.0,
+    "traffic_level": 68.0,
+    "temperature": 26.8,
+    "ecosystem_health": 43.0,
+    "risk_level": "high",
+    "sustainability_score": 34.5,
 }
 
 FINAL_METRICS = {
@@ -74,8 +74,8 @@ SAMPLE_ANALYSIS = (
 
 _REPORT_BASE = dict(
     goal="Reduce pollution but keep traffic flowing",
-    zone_name="Calumet Industrial Strip",
-    zone_type="industrial",
+    zone_name="Asia",
+    zone_type="continent",
     actions=ACTIONS,
     initial_metrics=INITIAL_METRICS,
     final_metrics=FINAL_METRICS,
@@ -424,7 +424,7 @@ def test_suggest_improvements_contains_all_sections(gemini_analysis: str) -> Non
 @_LIVE
 @_SKIP_NO_KEY
 def test_suggest_improvements_references_zone_name(gemini_analysis: str) -> None:
-    assert "Calumet" in gemini_analysis or "Industrial" in gemini_analysis
+    assert "Asia" in gemini_analysis
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -444,8 +444,8 @@ def test_e2e_pdf_from_fixture_pipeline(
         "/api/v1/simulation/report",
         json={
             "goal": "Reduce pollution but keep traffic flowing",
-            "zone_name": "Calumet Industrial Strip",
-            "zone_type": "industrial",
+            "zone_name": "Asia",
+            "zone_type": "continent",
             "actions": gemini_actions,
             "initial_metrics": INITIAL_METRICS,
             "final_metrics": projected_zone,
