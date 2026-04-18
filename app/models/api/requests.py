@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.domain.action import AudienceType, SimulationMode
-from app.models.domain.planning import InfrastructureCategory, MitigationCommitment, PlannerProjectType
+from app.models.domain.planning import GeometryPoint, InfrastructureCategory, MitigationCommitment, PlannerProjectType
 
 
 class ApplyActionRequest(BaseModel):
@@ -72,6 +72,7 @@ class ProposalAssessmentRequest(BaseModel):
     area_id: str
     project_type: PlannerProjectType | None = None
     infrastructure_type: InfrastructureCategory | None = None
+    geometry_points: list[GeometryPoint] = Field(default_factory=list)
     infrastructure_details: dict[str, Any] = Field(default_factory=dict)
     footprint_acres: float | None = Field(default=None, gt=0, le=5000)
     estimated_daily_vehicle_trips: int | None = Field(default=None, ge=0, le=50000)
@@ -95,3 +96,11 @@ class ProposalAssessmentRequest(BaseModel):
                 "footprint_acres, estimated_daily_vehicle_trips, and buildout_years."
             )
         return self
+
+
+class GeometryResolutionRequest(BaseModel):
+    site_id: str
+    area_id: str
+    infrastructure_type: InfrastructureCategory
+    geometry_points: list[GeometryPoint] = Field(min_length=2)
+    infrastructure_details: dict[str, Any] = Field(default_factory=dict)

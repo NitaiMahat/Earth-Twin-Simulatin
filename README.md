@@ -53,6 +53,12 @@ The backend exposes build sections for:
 - `general_area`
 - `solar_panel`
 
+Each section can also advertise a map tool:
+- line-based sections
+  - user clicks a start point and an end point
+- polygon-based sections
+  - user clicks the site boundary corners
+
 The backend maps that brief into deterministic simulation actions, runs the submitted plan and a stronger mitigated plan, then returns a scorecard for both.
 
 ## Project Layout
@@ -165,12 +171,26 @@ curl http://127.0.0.1:8000/api/v1/planning/site
 
 `GET /api/v1/planning/build-options`
 
-Returns the build sections and the custom fields each section needs. This is the best endpoint for driving the frontend form builder.
+Returns the build sections, the custom fields each section needs, and the map tool each section should use. This is the best endpoint for driving the frontend form builder.
 
 Example:
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/planning/build-options
+```
+
+### Resolve Geometry From Map Clicks
+
+`POST /api/v1/planning/geometry/resolve`
+
+Use this when the user clicks points on the map and you want the backend to derive values like road length, runway length, or polygon area before running the final simulation.
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/planning/geometry/resolve ^
+  -H "Content-Type: application/json" ^
+  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"arterial_infill_corridor\",\"infrastructure_type\":\"road\",\"geometry_points\":[{\"latitude\":41.6401,\"longitude\":-87.5601},{\"latitude\":41.6501,\"longitude\":-87.5401}],\"infrastructure_details\":{\"lane_count\":4,\"daily_vehicle_trips\":1800,\"construction_years\":3}}"
 ```
 
 ### Assess a Proposal
@@ -182,7 +202,7 @@ Example:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/planning/proposals/assess ^
   -H "Content-Type: application/json" ^
-  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"infrastructure_type\":\"airport\",\"infrastructure_details\":{\"runway_length_m\":2400,\"runway_width_m\":45,\"terminal_area_sq_m\":18000,\"apron_area_sq_m\":42000,\"daily_vehicle_trips\":3200,\"construction_years\":5},\"mitigation_commitment\":\"medium\",\"planner_notes\":\"Regional cargo airport expansion.\"}"
+  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"infrastructure_type\":\"airport\",\"geometry_points\":[{\"latitude\":41.6400,\"longitude\":-87.5700},{\"latitude\":41.6540,\"longitude\":-87.5450}],\"infrastructure_details\":{\"runway_width_m\":45,\"terminal_area_sq_m\":18000,\"apron_area_sq_m\":42000,\"daily_vehicle_trips\":3200,\"construction_years\":5},\"mitigation_commitment\":\"medium\",\"planner_notes\":\"Regional cargo airport expansion.\"}"
 ```
 
 Response shape:
@@ -193,8 +213,26 @@ Response shape:
   "area_id": "calumet_industrial_strip",
   "project_type": "industrial_facility",
   "infrastructure_type": "airport",
+  "geometry_summary": {
+    "selection_mode": "line",
+    "point_count": 2,
+    "start_point": {
+      "latitude": 41.64,
+      "longitude": -87.57
+    },
+    "end_point": {
+      "latitude": 41.654,
+      "longitude": -87.545
+    },
+    "center_point": {
+      "latitude": 41.647,
+      "longitude": -87.5575
+    },
+    "length_m": 2556.42,
+    "area_sq_m": null
+  },
   "infrastructure_details": {
-    "runway_length_m": 2400,
+    "runway_length_m": 2556.42,
     "runway_width_m": 45,
     "terminal_area_sq_m": 18000,
     "apron_area_sq_m": 42000,
@@ -250,8 +288,26 @@ Response shape:
     "traffic_bucket": "high",
     "resolved_project_type": "industrial_facility",
     "infrastructure_type": "airport",
+    "geometry_summary": {
+      "selection_mode": "line",
+      "point_count": 2,
+      "start_point": {
+        "latitude": 41.64,
+        "longitude": -87.57
+      },
+      "end_point": {
+        "latitude": 41.654,
+        "longitude": -87.545
+      },
+      "center_point": {
+        "latitude": 41.647,
+        "longitude": -87.5575
+      },
+      "length_m": 2556.42,
+      "area_sq_m": null
+    },
     "infrastructure_details": {
-      "runway_length_m": 2400,
+      "runway_length_m": 2556.42,
       "runway_width_m": 45,
       "terminal_area_sq_m": 18000,
       "apron_area_sq_m": 42000,

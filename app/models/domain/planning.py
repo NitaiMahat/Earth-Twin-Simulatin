@@ -26,6 +26,11 @@ class PlanningFieldType(str, Enum):
     TEXT = "text"
 
 
+class GeometrySelectionMode(str, Enum):
+    LINE = "line"
+    POLYGON = "polygon"
+
+
 class MitigationCommitment(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -49,12 +54,26 @@ class BuildFieldDefinition(BaseModel):
     help_text: str
 
 
+class GeometryPoint(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class MapToolDefinition(BaseModel):
+    selection_mode: GeometrySelectionMode
+    min_points: int
+    max_points: int
+    instructions: str
+    auto_derived_fields: list[str]
+
+
 class BuildSectionDefinition(BaseModel):
     infrastructure_type: InfrastructureCategory
     title: str
     summary: str
     default_project_type: PlannerProjectType
     fields: list[BuildFieldDefinition]
+    map_tool: MapToolDefinition | None = None
 
 
 class PlanningAreaDefinition(BaseModel):
