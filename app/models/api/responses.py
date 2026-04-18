@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from app.models.domain.action import AudienceType, SimulationMode
+from app.models.domain.builder import BuilderProjectStatus, BuilderRole
 from app.models.domain.planning import (
     BuildSectionDefinition,
     GeometryPoint,
@@ -240,3 +241,90 @@ class ProposalAssessmentResponse(BaseModel):
     recommended_option: str
     comparison_summary: str
     simulation_inputs: PlannerSimulationInputsResponse
+
+
+class BuilderIdentityResponse(BaseModel):
+    subject: str
+    email: str
+    display_name: str
+    organization_id: str
+    role: BuilderRole
+
+
+class BuilderManagedAreaResponse(BaseModel):
+    area_id: str
+    name: str
+    baseline_zone_id: str
+    current_risk_level: str
+    planning_notes: str
+    allowed_project_types: list[PlannerProjectType]
+
+
+class BuilderManagedSiteResponse(BaseModel):
+    site_id: str
+    name: str
+    country: str
+    state: str
+    summary: str
+    area_count: int
+
+
+class BuilderManagedSiteAreaListResponse(BaseModel):
+    site_id: str
+    name: str
+    country: str
+    state: str
+    summary: str
+    areas: list[BuilderManagedAreaResponse]
+
+
+class BuilderProjectSummaryResponse(BaseModel):
+    project_id: str
+    project_name: str
+    site_id: str
+    area_id: str
+    infrastructure_type: InfrastructureCategory | None
+    project_type: PlannerProjectType | None
+    status: BuilderProjectStatus
+    latest_recommendation: str | None
+    created_at: str
+    updated_at: str
+
+
+class BuilderProjectListResponse(BaseModel):
+    projects: list[BuilderProjectSummaryResponse]
+    count: int
+
+
+class BuilderProjectDetailResponse(BaseModel):
+    project_id: str
+    project_name: str
+    owner: BuilderIdentityResponse
+    site_id: str
+    area_id: str
+    status: BuilderProjectStatus
+    proposal: dict[str, object]
+    latest_report: ProposalAssessmentResponse | None
+    created_at: str
+    updated_at: str
+
+
+class BuilderProjectReportResponse(BaseModel):
+    project_id: str
+    project_name: str
+    report: ProposalAssessmentResponse
+    last_updated_at: str
+
+
+class BuilderProjectHistoryEntryResponse(BaseModel):
+    snapshot_id: str
+    created_at: str
+    recommended_option: str
+    report: ProposalAssessmentResponse
+
+
+class BuilderProjectHistoryResponse(BaseModel):
+    project_id: str
+    project_name: str
+    entries: list[BuilderProjectHistoryEntryResponse]
+    count: int

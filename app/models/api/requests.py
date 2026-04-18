@@ -104,3 +104,13 @@ class GeometryResolutionRequest(BaseModel):
     infrastructure_type: InfrastructureCategory
     geometry_points: list[GeometryPoint] = Field(min_length=2)
     infrastructure_details: dict[str, Any] = Field(default_factory=dict)
+
+
+class BuilderProjectCreateRequest(ProposalAssessmentRequest):
+    project_name: str = Field(min_length=1, max_length=120)
+
+
+class BuilderProjectSimulateRequest(BaseModel):
+    project_name: str | None = Field(default=None, min_length=1, max_length=120)
+    mitigation_commitment: MitigationCommitment | None = None
+    planner_notes: str | None = None

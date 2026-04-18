@@ -39,5 +39,13 @@ class Settings:
     def planning_site_path(self) -> Path:
         return self.base_dir / "data" / "planning_site.json"
 
+    @property
+    def builder_sites_path(self) -> Path:
+        return self.base_dir / "data" / "builder_sites.json"
+
+    @property
+    def builder_identities_path(self) -> Path:
+        return self.base_dir / "data" / "builder_identities.json"
+
 
 settings = Settings()

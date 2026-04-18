@@ -1,0 +1,38 @@
+[
+  {
+    "token": "builder-demo-token",
+    "provider": "demo_oidc",
+    "subject": "builder_user_1",
+    "email": "builder1@earthtwin.demo",
+    "display_name": "Builder One",
+    "organization_id": "org_augie_build",
+    "role": "builder"
+  },
+  {
+    "token": "builder-org-token",
+    "provider": "demo_oidc",
+    "subject": "builder_user_2",
+    "email": "builder2@earthtwin.demo",
+    "display_name": "Builder Teammate",
+    "organization_id": "org_augie_build",
+    "role": "builder"
+  },
+  {
+    "token": "builder-other-org-token",
+    "provider": "demo_oidc",
+    "subject": "builder_user_3",
+    "email": "builder3@earthtwin.demo",
+    "display_name": "Builder Other Org",
+    "organization_id": "org_other_build",
+    "role": "builder"
+  },
+  {
+    "token": "education-demo-token",
+    "provider": "demo_oidc",
+    "subject": "educator_user_1",
+    "email": "educator@earthtwin.demo",
+    "display_name": "Education User",
+    "organization_id": "org_education",
+    "role": "educator"
+  }
+]
