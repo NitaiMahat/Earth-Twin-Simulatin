@@ -1,51 +1,62 @@
 # Earth Twin Backend
 
-Earth Twin Backend is a FastAPI demo service for an Illinois municipal planning workflow.
+Earth Twin Backend is a FastAPI service for an infrastructure planning demo. It is built to help planners, municipalities, and local governments quickly test how a proposed project might affect environmental risk and sustainability before anything is built.
 
-This version focuses on one planner-facing story:
-- choose a preconfigured area inside the Illinois Calumet Corridor demo site
-- submit a proposed project brief
-- simulate the submitted plan over 5 years
-- compare it against an auto-mitigated alternative
-- return a planner scorecard with risks, verdict, and required mitigations
+This backend is designed to be easy for frontend teams to use:
+- it exposes planner-friendly endpoints
+- it describes which form fields each infrastructure type needs
+- it supports map-driven point selection
+- it calculates geometry from clicked map points
+- it converts those values into a simulation automatically
 
-It is intentionally lightweight:
-- Python, FastAPI, and Pydantic
-- JSON seed data plus in-memory state
-- deterministic simulation rules
-- no auth, database, background jobs, or GIS lookup
+Important: this is a deterministic planning demo backend, not a scientific climate model and not a full GIS platform.
 
-Important: this is a decision-support demo backend. It is not a scientific climate model and it does not do free-form parcel geocoding.
+## What The Product Does
 
-## Product Focus
+The backend supports one main workflow:
+1. choose a demo planning area in Illinois
+2. choose an infrastructure type such as road, bridge, buildings, airport, general area, or solar panel
+3. either fill in infrastructure details manually or draw/select points on a map
+4. let the backend derive values like road length, runway length, or site area
+5. run a 5-year simulation
+6. compare the submitted plan against a stronger mitigated alternative
+7. return a planner-friendly scorecard and recommendation
 
-Primary audience:
-- urban planners
-- municipalities
-- local governments
-
-Supporting audiences:
-- students
-- educators
-- demo stakeholders who want to inspect the underlying simulation APIs
-
-## Current Demo Story
-
-The backend is centered on one fixed site:
+The current demo is centered on one fixed site:
 - `illinois_calumet_corridor_demo`
 
-The planner chooses one of three proposal areas:
+Within that site, the user chooses one of three proposal areas:
 - `calumet_industrial_strip`
 - `arterial_infill_corridor`
 - `river_buffer_redevelopment`
 
-The planner then submits:
-- `infrastructure_type`
-- infrastructure-specific detail fields such as runway size, bridge span, road lanes, building floor area, site area, or solar field area
-- `mitigation_commitment`
-- optional `planner_notes`
+## Why It Is Useful
 
-The backend exposes build sections for:
+This backend is useful because it gives a frontend application a ready-made planning engine without requiring the frontend to own complex business logic.
+
+It helps with:
+- infrastructure proposal intake
+- dynamic form generation
+- map-based geometry input
+- environmental risk explanation
+- scenario comparison
+- demo-ready recommendation outputs
+
+For planners and municipalities, that means they can explore questions like:
+- what happens if we add a new road corridor here?
+- how risky is an airport runway expansion in this zone?
+- what does a solar field or redevelopment area do to sustainability?
+- does a mitigated version of the plan perform better?
+
+For frontend developers, it means they do not need to hardcode:
+- every infrastructure form shape
+- geometry calculations
+- simulation mapping logic
+- planner scorecard logic
+
+## Current Infrastructure Types
+
+The backend currently supports these infrastructure sections:
 - `road`
 - `bridge`
 - `buildings`
@@ -53,139 +64,165 @@ The backend exposes build sections for:
 - `general_area`
 - `solar_panel`
 
-Each section can also advertise a map tool:
-- line-based sections
-  - user clicks a start point and an end point
-- polygon-based sections
-  - user clicks the site boundary corners
+Each section includes its own field definitions and map interaction mode.
 
-The backend maps that brief into deterministic simulation actions, runs the submitted plan and a stronger mitigated plan, then returns a scorecard for both.
+Examples:
+- `road`
+  - lane count
+  - daily vehicle trips
+  - optional paved area
+  - map line tool to derive `length_km`
+- `bridge`
+  - deck width
+  - daily vehicle trips
+  - optional approach area
+  - map line tool to derive `span_length_m`
+- `airport`
+  - runway width
+  - terminal area
+  - apron area
+  - daily vehicle trips
+  - map line tool to derive `runway_length_m`
+- `buildings`
+  - building count
+  - total floor area
+  - daily trips
+  - map polygon tool to derive `site_area_sq_m`
+- `general_area`
+  - impervious surface percentage
+  - daily trips
+  - map polygon tool to derive `site_area_sq_m`
+- `solar_panel`
+  - capacity
+  - battery storage
+  - maintenance trips
+  - map polygon tool to derive `panel_field_area_sq_m`
 
-## Project Layout
+## How Map-Based Geometry Works
 
-```text
-earth-twin-backend/
-  app/
-    main.py
-    api/v1/endpoints/
-      health.py
-      world.py
-      zones.py
-      simulation.py
-      scenarios.py
-      ai.py
-      planning.py
-    data/
-      seed_world.json
-      scenario_templates.json
-      planning_site.json
-    services/
-      planning_service.py
-      simulation_engine.py
-      impact_service.py
-      ai_service.py
-      world_service.py
-      zone_service.py
-  tests/
-  requirements.txt
-  README.md
-```
+The backend supports a map-first frontend flow.
 
-## Run Locally
+Frontend responsibilities:
+- show the map
+- let the user click points
+- draw the selected line or polygon
+- send the clicked points to the backend
+- render the returned preview and simulation result
 
-```bash
-cd earth-twin-backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+Backend responsibilities:
+- validate the point selection
+- calculate geometry values from the clicked points
+- derive infrastructure-specific fields
+- run the simulation
+- return planner scorecards and recommendations
 
-Base URL:
-- `http://127.0.0.1:8000`
+The current geometry calculations are backend math, not external APIs:
+- line-based infrastructure uses the Haversine formula to calculate straight-line distance from latitude/longitude points
+- polygon-based infrastructure converts lat/lng to a local XY plane and computes polygon area
 
-Interactive docs:
-- `http://127.0.0.1:8000/docs`
+This is intentional for the demo:
+- fast
+- free
+- deterministic
+- easy to test
 
-## Deployment
+Current limitation:
+- it does not snap to real road networks
+- it does not call parcel GIS services
+- it does not use real airport or zoning datasets
 
-This backend is ready for GitHub-based deployment on platforms like Render and Koyeb.
-
-Included deploy files:
-- `render.yaml`
-- `Procfile`
-- `runtime.txt`
-
-Important runtime settings:
-- `PORT`
-  - Set by most hosts automatically
-- `CORS_ORIGINS`
-  - Default is `*` for demo friendliness
-  - For a tighter setup, set a comma-separated list such as:
-  - `https://your-frontend.vercel.app,http://localhost:3000`
-
-Health check path:
-- `/api/v1/health`
-
-### Fastest Free Path: Render
-
-Render currently documents free web services for testing and hobby use:
-- https://render.com/docs/free
-- https://render.com/docs/deploy-fastapi
-
-Steps:
-1. Open Render and create a new Web Service from your GitHub repo.
-2. Select this repository and branch `main`.
-3. Render can use the included `render.yaml`, or you can enter:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Set `CORS_ORIGINS` to your frontend URLs.
-5. Deploy and share the generated `onrender.com` URL with the frontend team.
-
-### Free Alternative: Koyeb
-
-Koyeb currently documents FastAPI deployment and a free starter tier:
-- https://www.koyeb.com/docs/deploy/fastapi
-- https://www.koyeb.com/pricing/
-
-Use:
-- Run command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Port: `8000`
-- Health path: `/api/v1/health`
+So if a user clicks two points for a road, the backend computes straight-line distance, not actual road travel distance.
 
 ## Main Planner Endpoints
 
-### Get Site Metadata
+### 1. Get Site Metadata
 
 `GET /api/v1/planning/site`
 
-Returns the Illinois demo site and the three selectable proposal areas.
+Use this to load the Illinois demo site and its proposal areas.
 
-Example:
-
-```bash
-curl http://127.0.0.1:8000/api/v1/planning/site
-```
-
-### Get Build Section Metadata
+### 2. Get Build Section Metadata
 
 `GET /api/v1/planning/build-options`
 
-Returns the build sections, the custom fields each section needs, and the map tool each section should use. This is the best endpoint for driving the frontend form builder.
+Use this to drive the frontend form builder.
 
-Example:
+This endpoint returns:
+- infrastructure sections
+- section summaries
+- field definitions
+- map tool definitions
+
+The frontend should use this endpoint to decide:
+- which card to show for each infrastructure type
+- which fields are required
+- whether the user should draw a line or polygon
+- how many points are expected
+
+### 3. Resolve Geometry From Clicked Points
+
+`POST /api/v1/planning/geometry/resolve`
+
+Use this to preview geometry-derived values after the user clicks points on the map.
+
+Examples of derived values:
+- road length
+- bridge span
+- runway length
+- site area
+- solar field area
+
+This is the best endpoint for:
+- live preview
+- "did the map selection work?" checks
+- showing auto-filled values before simulation
+
+### 4. Assess a Proposal
+
+`POST /api/v1/planning/proposals/assess`
+
+Use this to run the actual planning simulation.
+
+This endpoint returns:
+- resolved project type
+- derived infrastructure details
+- footprint and traffic buckets
+- submitted plan scorecard
+- mitigated plan scorecard
+- recommended option
+- comparison summary
+
+## Recommended Frontend Flow
+
+The best frontend integration flow is:
+
+1. Call `GET /api/v1/planning/site`
+2. Call `GET /api/v1/planning/build-options`
+3. Let the user choose:
+   - area
+   - infrastructure type
+4. Read the chosen section's `map_tool`
+5. Let the user click:
+   - 2 points for line tools
+   - 3+ points for polygon tools
+6. Call `POST /api/v1/planning/geometry/resolve`
+7. Show the user the derived values
+8. Submit the final proposal to `POST /api/v1/planning/proposals/assess`
+9. Render:
+   - `submitted_plan`
+   - `mitigated_plan`
+   - `recommended_option`
+   - `comparison_summary`
+
+## Example Requests
+
+### Build Options
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/planning/build-options
 ```
 
-### Resolve Geometry From Map Clicks
-
-`POST /api/v1/planning/geometry/resolve`
-
-Use this when the user clicks points on the map and you want the backend to derive values like road length, runway length, or polygon area before running the final simulation.
-
-Example:
+### Geometry Resolve For Road
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/planning/geometry/resolve ^
@@ -193,131 +230,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/planning/geometry/resolve ^
   -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"arterial_infill_corridor\",\"infrastructure_type\":\"road\",\"geometry_points\":[{\"latitude\":41.6401,\"longitude\":-87.5601},{\"latitude\":41.6501,\"longitude\":-87.5401}],\"infrastructure_details\":{\"lane_count\":4,\"daily_vehicle_trips\":1800,\"construction_years\":3}}"
 ```
 
-### Assess a Proposal
-
-`POST /api/v1/planning/proposals/assess`
-
-Example:
+### Proposal Assessment For Airport Using Map Points
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/planning/proposals/assess ^
   -H "Content-Type: application/json" ^
   -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"infrastructure_type\":\"airport\",\"geometry_points\":[{\"latitude\":41.6400,\"longitude\":-87.5700},{\"latitude\":41.6540,\"longitude\":-87.5450}],\"infrastructure_details\":{\"runway_width_m\":45,\"terminal_area_sq_m\":18000,\"apron_area_sq_m\":42000,\"daily_vehicle_trips\":3200,\"construction_years\":5},\"mitigation_commitment\":\"medium\",\"planner_notes\":\"Regional cargo airport expansion.\"}"
-```
-
-Response shape:
-
-```json
-{
-  "site_id": "illinois_calumet_corridor_demo",
-  "area_id": "calumet_industrial_strip",
-  "project_type": "industrial_facility",
-  "infrastructure_type": "airport",
-  "geometry_summary": {
-    "selection_mode": "line",
-    "point_count": 2,
-    "start_point": {
-      "latitude": 41.64,
-      "longitude": -87.57
-    },
-    "end_point": {
-      "latitude": 41.654,
-      "longitude": -87.545
-    },
-    "center_point": {
-      "latitude": 41.647,
-      "longitude": -87.5575
-    },
-    "length_m": 2556.42,
-    "area_sq_m": null
-  },
-  "infrastructure_details": {
-    "runway_length_m": 2556.42,
-    "runway_width_m": 45,
-    "terminal_area_sq_m": 18000,
-    "apron_area_sq_m": 42000,
-    "daily_vehicle_trips": 3200,
-    "construction_years": 5
-  },
-  "footprint_acres": 39.29,
-  "estimated_daily_vehicle_trips": 3200,
-  "buildout_years": 5,
-  "mitigation_commitment": "medium",
-  "submitted_plan": {
-    "plan_score": 41.23,
-    "verdict": "conditional",
-    "overall_outlook": "mixed",
-    "highest_risk_zone": {
-      "zone_id": "zone_calumet_industrial_strip",
-      "name": "Calumet Industrial Strip",
-      "risk_level": "high",
-      "sustainability_score": 32.5
-    },
-    "top_risks": [
-      "High pollution (63.0) is adding direct environmental stress."
-    ],
-    "required_mitigations": [
-      "Require emissions controls and pollution monitoring before approval."
-    ],
-    "summary_text": "Projected to 2031. Highest risk is Calumet Industrial Strip."
-  },
-  "mitigated_plan": {
-    "plan_score": 48.76,
-    "verdict": "recommended",
-    "overall_outlook": "positive",
-    "highest_risk_zone": {
-      "zone_id": "zone_calumet_industrial_strip",
-      "name": "Calumet Industrial Strip",
-      "risk_level": "medium",
-      "sustainability_score": 44.1
-    },
-    "top_risks": [
-      "Low ecosystem health (52.0) reduces the zone's ability to absorb shocks."
-    ],
-    "required_mitigations": [
-      "Maintain the proposed mitigation bundle and monitor the highest-risk parcel during delivery."
-    ],
-    "summary_text": "Projected to 2031. Highest risk is Calumet Industrial Strip."
-  },
-  "recommended_option": "mitigated_plan",
-  "comparison_summary": "Mitigated Plan is the preferred scenario because it delivers the strongest sustainability outcome with lower long-term environmental risk.",
-  "simulation_inputs": {
-    "projection_years": 5,
-    "baseline_zone_id": "zone_calumet_industrial_strip",
-    "footprint_bucket": "large",
-    "traffic_bucket": "high",
-    "resolved_project_type": "industrial_facility",
-    "infrastructure_type": "airport",
-    "geometry_summary": {
-      "selection_mode": "line",
-      "point_count": 2,
-      "start_point": {
-        "latitude": 41.64,
-        "longitude": -87.57
-      },
-      "end_point": {
-        "latitude": 41.654,
-        "longitude": -87.545
-      },
-      "center_point": {
-        "latitude": 41.647,
-        "longitude": -87.5575
-      },
-      "length_m": 2556.42,
-      "area_sq_m": null
-    },
-    "infrastructure_details": {
-      "runway_length_m": 2556.42,
-      "runway_width_m": 45,
-      "terminal_area_sq_m": 18000,
-      "apron_area_sq_m": 42000,
-      "daily_vehicle_trips": 3200,
-      "construction_years": 5
-    },
-    "submitted_actions": [],
-    "mitigated_actions": []
-  }
-}
 ```
 
 ## Other API Endpoints
@@ -346,39 +264,72 @@ Response shape:
 ### AI Explain
 - `POST /api/v1/ai/explain`
 
-## Existing Modes
+## Deployment
 
-Earth Twin still supports:
-- `planning`
-- `learning`
+This repo is ready for GitHub-based deployment.
 
-The new planner proposal flow always uses `planning` mode internally.
+Included deploy files:
+- `render.yaml`
+- `Procfile`
+- `runtime.txt`
 
-## Supported Simulation Actions
+Recommended free hosting path:
+- Render
 
-Planning-oriented labels:
-- `reduce_green_space`
-- `expand_roadway`
-- `industrial_expansion`
-- `add_urban_park`
-- `improve_public_transit`
-- `restoration_corridor`
+Current deployed example:
+- docs: `https://earth-twin-simulatin.onrender.com/docs`
+- base: `https://earth-twin-simulatin.onrender.com`
 
-Learning-oriented labels:
-- `cut_trees`
-- `increase_traffic`
-- `increase_pollution`
-- `restore_ecosystem`
+Important environment variable:
+- `CORS_ORIGINS`
+  - set to `*` for broad demo access
+  - or set to specific frontend domains like:
+  - `http://localhost:3000,https://your-frontend-domain.vercel.app`
 
-Legacy labels still supported:
-- `deforestation`
-- `traffic_increase`
-- `pollution_spike`
-- `restoration`
+Render settings:
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health Check Path: `/api/v1/health`
 
-## Notes for Demo Usage
+## Local Development
 
-- The planner flow is the recommended starting point in `/docs`.
-- The world remains in memory only; restart the app or call `/api/v1/world/reset` to restore seed values.
-- The raw simulation endpoints are still available for debugging and demos, but they expose lower-level actions than the planner scorecard flow.
-- For browser frontend access, set `CORS_ORIGINS` to the frontend domains before sharing the deployment URL.
+```bash
+cd earth-twin-backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Local URLs:
+- Base URL: `http://127.0.0.1:8000`
+- Swagger docs: `http://127.0.0.1:8000/docs`
+
+## Project Layout
+
+```text
+earth-twin-backend/
+  app/
+    api/v1/endpoints/
+    core/
+    data/
+    models/
+    repositories/
+    rules/
+    services/
+  tests/
+  render.yaml
+  Procfile
+  runtime.txt
+  requirements.txt
+  README.md
+```
+
+## Notes And Limitations
+
+- The world state is stored in memory only.
+- Restarting the service or calling `/api/v1/world/reset` restores the seed data.
+- This is a demo backend, not a persistent planning system.
+- Geometry is calculated internally from map points and is approximate.
+- The backend currently does not connect to real parcel GIS, road routing, or zoning APIs.
+- The raw simulation endpoints remain available, but the planner endpoints are the recommended product-facing integration path.
