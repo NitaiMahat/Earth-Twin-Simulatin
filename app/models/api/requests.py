@@ -181,3 +181,4 @@ class SaveProjectReportRequest(BaseModel):
     ai_analysis: str | None = None
     pdf_url: str | None = Field(default=None, max_length=2000)
     pdf_filename: str | None = Field(default=None, max_length=255)
+    storage_path: str | None = Field(default=None, max_length=1000)

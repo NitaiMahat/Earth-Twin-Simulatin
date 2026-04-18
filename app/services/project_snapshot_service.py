@@ -25,6 +25,8 @@ from app.models.domain.planning import (
 )
 from app.repositories.project_snapshot_repository import ProjectSnapshotRepository
 from app.services.planning_service import planning_service
+from app.services.report_service import generate_assessment_pdf_report
+from app.services.supabase_storage_service import supabase_storage_service
 
 
 class ProjectSnapshotService:
@@ -41,10 +43,18 @@ class ProjectSnapshotService:
 
     def _report_response(self, payload: dict[str, object] | None) -> ProjectReportMetadataResponse:
         report_payload = payload or {}
+        storage_path = report_payload.get("storage_path") if isinstance(report_payload.get("storage_path"), str) else None
+        pdf_url = report_payload.get("pdf_url") if isinstance(report_payload.get("pdf_url"), str) else None
+        if storage_path and supabase_storage_service.configured:
+            try:
+                pdf_url = supabase_storage_service.get_file_url(storage_path)
+            except RuntimeError:
+                pdf_url = pdf_url
         return ProjectReportMetadataResponse(
             ai_analysis=report_payload.get("ai_analysis") if isinstance(report_payload.get("ai_analysis"), str) else None,
-            pdf_url=report_payload.get("pdf_url") if isinstance(report_payload.get("pdf_url"), str) else None,
+            pdf_url=pdf_url,
             pdf_filename=report_payload.get("pdf_filename") if isinstance(report_payload.get("pdf_filename"), str) else None,
+            storage_path=storage_path,
             updated_at=report_payload.get("updated_at") if isinstance(report_payload.get("updated_at"), str) else None,
         )
 
@@ -63,6 +73,11 @@ class ProjectSnapshotService:
             ),
             location_label=str(record["location_label"]),
             recommended_option=str(record["recommended_option"]),
+            project_summary=(
+                str(record["assessment_payload"].get("analysis_document", {}).get("summary"))
+                if isinstance(record.get("assessment_payload"), dict)
+                else None
+            ),
             latest_report=self._report_response(record.get("latest_report_payload") if isinstance(record, dict) else {}),
         )
 
@@ -187,12 +202,48 @@ class ProjectSnapshotService:
             "ai_analysis": payload.ai_analysis,
             "pdf_url": payload.pdf_url,
             "pdf_filename": payload.pdf_filename,
+            "storage_path": payload.storage_path,
             "updated_at": datetime.now(UTC).isoformat(),
         }
         record = repository.update_report(user.user_id, project_id, report_payload)
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         return self._detail_response(record)
+
+    def generate_and_store_report(self, user: AuthenticatedUser, project_id: str) -> SavedProjectDetailResponse:
+        repository = self._require_repository()
+        record = repository.get_project(user.user_id, project_id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+        if not supabase_storage_service.configured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase storage is not configured on the backend.",
+            )
+
+        assessment = ProposalAssessmentResponse.model_validate(record["assessment_payload"])
+        pdf_bytes = generate_assessment_pdf_report(assessment)
+        filename = f"{record['project_name']}-analysis.pdf".replace(" ", "-")
+        upload_result = supabase_storage_service.upload_pdf(
+            user_id=user.user_id,
+            project_id=project_id,
+            filename=filename,
+            pdf_bytes=pdf_bytes,
+        )
+        report_payload = {
+            "ai_analysis": assessment.analysis_document.ai_analysis,
+            "pdf_url": upload_result["pdf_url"],
+            "pdf_filename": upload_result["pdf_filename"],
+            "storage_path": upload_result["storage_path"],
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        updated_record = repository.update_report(user.user_id, project_id, report_payload)
+        if updated_record is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Report metadata could not be saved after upload.",
+            )
+        return self._detail_response(updated_record)
 
 
 project_snapshot_service = ProjectSnapshotService()

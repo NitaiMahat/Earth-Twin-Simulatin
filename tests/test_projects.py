@@ -4,6 +4,7 @@ from app.api.deps.supabase_auth import get_current_user
 from app.main import app
 from app.models.domain.auth import AuthenticatedUser
 from app.services.project_snapshot_service import project_snapshot_service
+from app.services.supabase_storage_service import supabase_storage_service
 
 client = TestClient(app)
 
@@ -117,6 +118,7 @@ def test_save_and_list_my_projects() -> None:
     assert payload["count"] == 1
     assert payload["projects"][0]["project_name"] == "Chicago Cargo Airport"
     assert payload["projects"][0]["latest_report"]["pdf_url"] is None
+    assert payload["projects"][0]["project_summary"]
 
 
 def test_update_project_report_metadata() -> None:
@@ -178,3 +180,44 @@ def test_save_project_persists_text_planning_snapshot() -> None:
     assert payload["text_planning"]["planner_summary"] == "Airport concept with mapped runway alignment."
     assert payload["text_planning"]["inferred_infrastructure_type"] == "airport"
     assert payload["text_planning"]["used_user_overrides"] is True
+    assert payload["assessment"]["analysis_document"]["summary"]
+
+
+def test_generate_project_report_uploads_to_supabase_storage(monkeypatch) -> None:
+    save_response = client.post(
+        "/api/v1/my-projects",
+        json={
+            "project_name": "Chicago Report Project",
+            "location": CHICAGO_LOCATION,
+            "project_type": "industrial_facility",
+            "footprint_acres": 45,
+            "estimated_daily_vehicle_trips": 2600,
+            "buildout_years": 4,
+            "mitigation_commitment": "medium",
+        },
+    )
+    project_id = save_response.json()["project_id"]
+
+    monkeypatch.setattr(type(supabase_storage_service), "configured", property(lambda self: True))
+    monkeypatch.setattr(
+        supabase_storage_service,
+        "upload_pdf",
+        lambda **kwargs: {
+            "storage_path": f"user-123/{project_id}/report.pdf",
+            "pdf_filename": "report.pdf",
+            "pdf_url": "https://example.supabase.co/storage/v1/object/sign/project-reports/report.pdf",
+        },
+    )
+    monkeypatch.setattr(
+        supabase_storage_service,
+        "get_file_url",
+        lambda storage_path: "https://example.supabase.co/storage/v1/object/sign/project-reports/report.pdf",
+    )
+
+    response = client.post(f"/api/v1/my-projects/{project_id}/report/generate")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["latest_report"]["pdf_filename"] == "report.pdf"
+    assert payload["latest_report"]["storage_path"] == f"user-123/{project_id}/report.pdf"
+    assert payload["latest_report"]["pdf_url"] == "https://example.supabase.co/storage/v1/object/sign/project-reports/report.pdf"

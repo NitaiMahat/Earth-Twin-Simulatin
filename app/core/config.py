@@ -49,6 +49,13 @@ class Settings:
     supabase_jwt_secret: str = os.getenv("SUPABASE_JWT_SECRET", "")
     supabase_jwt_audience: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
     supabase_jwt_issuer: str = os.getenv("SUPABASE_JWT_ISSUER", "")
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    supabase_storage_bucket: str = os.getenv("SUPABASE_STORAGE_BUCKET", "project-reports")
+    supabase_storage_public: bool = os.getenv("SUPABASE_STORAGE_PUBLIC", "false").lower() == "true"
+    supabase_storage_signed_url_ttl_seconds: int = int(
+        os.getenv("SUPABASE_STORAGE_SIGNED_URL_TTL_SECONDS", "3600")
+    )
 
     @property
     def cors_origins(self) -> list[str]:

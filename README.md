@@ -266,6 +266,7 @@ Protected backend routes:
 - `POST /api/v1/my-projects`
 - `GET /api/v1/my-projects/{project_id}`
 - `PATCH /api/v1/my-projects/{project_id}/report`
+- `POST /api/v1/my-projects/{project_id}/report/generate`
 
 `My Projects` stores:
 - the saved planning assessment snapshot
@@ -292,7 +293,7 @@ It does not store the whole mutable simulation world state.
    - `recommended_option`
    - `comparison_summary`
 10. If the user is signed in, call `POST /api/v1/my-projects`
-11. When a report is generated later, call `PATCH /api/v1/my-projects/{project_id}/report`
+11. When a report is generated later, call `POST /api/v1/my-projects/{project_id}/report/generate`
 
 For text-driven planning:
 1. Let the user map the line first
@@ -330,6 +331,9 @@ For text-driven planning:
 - `POST /api/v1/planning/text/draft`
 - `POST /api/v1/planning/text/run`
 
+### Stored Project Reports
+- `POST /api/v1/my-projects/{project_id}/report/generate`
+
 ## Deployment
 
 Recommended free host:
@@ -354,6 +358,11 @@ Optional tuning:
 - `SUPABASE_JWT_SECRET`
 - `SUPABASE_JWT_AUDIENCE`
 - `SUPABASE_JWT_ISSUER`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET`
+- `SUPABASE_STORAGE_PUBLIC`
+- `SUPABASE_STORAGE_SIGNED_URL_TTL_SECONDS`
 - `PROVIDER_CACHE_TABLE_NAME`
 - `PUBLIC_DATA_TIMEOUT_SECONDS`
 - `PROVIDER_CACHE_TTL_SECONDS`
@@ -384,6 +393,8 @@ or the standard component vars:
 The backend creates the provider-cache table automatically on first use. If Postgres is not configured or unavailable, the app falls back to the current in-memory cache so local development still works.
 
 The same Postgres connection is also used for authenticated `My Projects` storage.
+
+If Supabase Storage is configured, the backend can also generate a project PDF, upload it to the configured bucket, and save the file metadata back onto the project record.
 
 ## Local Development
 

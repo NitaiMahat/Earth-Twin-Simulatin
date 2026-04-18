@@ -189,6 +189,9 @@ def test_assess_proposal_returns_scorecards_and_simulation_inputs() -> None:
     assert len(payload["simulation_inputs"]["submitted_actions"]) == 2
     assert len(payload["simulation_inputs"]["mitigated_actions"]) >= 3
     assert payload["simulation_inputs"]["submitted_actions"][0]["normalized_action_type"] == "pollution_spike"
+    assert payload["analysis_document"]["summary"]
+    assert payload["analysis_document"]["metric_cards"]
+    assert payload["analysis_document"]["sections"]["executive_summary"]
 
 
 def test_assess_proposal_accepts_infrastructure_specific_airport_details() -> None:
@@ -542,6 +545,8 @@ def test_text_run_uses_overrides_and_returns_assessment(monkeypatch) -> None:
     assert payload["assessment"]["infrastructure_details"]["lane_count"] == 6
     assert payload["assessment"]["estimated_daily_vehicle_trips"] == 2200
     assert payload["assessment"]["buildout_years"] == 4
+    assert payload["assessment"]["analysis_document"]["summary"]
+    assert payload["assessment"]["analysis_document"]["sections"]["key_findings"]
 
 
 def test_text_run_returns_missing_fields_validation(monkeypatch) -> None:

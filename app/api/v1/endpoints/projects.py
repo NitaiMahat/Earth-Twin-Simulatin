@@ -53,3 +53,11 @@ def update_project_report(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> SavedProjectDetailResponse:
     return project_snapshot_service.update_report(user, project_id, payload)
+
+
+@router.post("/{project_id}/report/generate", response_model=SavedProjectDetailResponse)
+def generate_project_report(
+    project_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> SavedProjectDetailResponse:
+    return project_snapshot_service.generate_and_store_report(user, project_id)

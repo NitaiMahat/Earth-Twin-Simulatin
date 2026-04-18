@@ -238,6 +238,35 @@ class PlanScorecardResponse(BaseModel):
     summary_text: str
 
 
+class AnalysisMetricCardResponse(BaseModel):
+    label: str
+    unit: str | None = None
+    baseline_value: float
+    submitted_value: float
+    mitigated_value: float
+    lower_is_better: bool = False
+
+
+class AnalysisSectionResponse(BaseModel):
+    executive_summary: str
+    key_findings: list[str]
+    improvement_recommendations: list[str]
+    long_term_outlook: str
+
+
+class ProjectAnalysisDocumentResponse(BaseModel):
+    title: str
+    simulated_project_summary: str
+    summary: str
+    recommended_option: str
+    generated_at: str
+    metric_cards: list[AnalysisMetricCardResponse]
+    submitted_top_risks: list[str]
+    mitigated_top_risks: list[str]
+    ai_analysis: str | None = None
+    sections: AnalysisSectionResponse
+
+
 class ProposalAssessmentResponse(BaseModel):
     location_context: PlanningLocationContextResponse
     continent_id: str
@@ -254,6 +283,7 @@ class ProposalAssessmentResponse(BaseModel):
     mitigated_plan: PlanScorecardResponse
     recommended_option: str
     comparison_summary: str
+    analysis_document: ProjectAnalysisDocumentResponse
     simulation_inputs: PlannerSimulationInputsResponse
 
 
@@ -305,6 +335,7 @@ class ProjectReportMetadataResponse(BaseModel):
     ai_analysis: str | None = None
     pdf_url: str | None = None
     pdf_filename: str | None = None
+    storage_path: str | None = None
     updated_at: str | None = None
 
 
@@ -327,6 +358,7 @@ class SavedProjectSummaryResponse(BaseModel):
     infrastructure_type: InfrastructureCategory | None
     location_label: str
     recommended_option: str
+    project_summary: str | None = None
     latest_report: ProjectReportMetadataResponse
 
 
