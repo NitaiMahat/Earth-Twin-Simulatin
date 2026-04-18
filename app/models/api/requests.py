@@ -104,3 +104,34 @@ class GeometryResolutionRequest(BaseModel):
     infrastructure_type: InfrastructureCategory
     geometry_points: list[GeometryPoint] = Field(min_length=2)
     infrastructure_details: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoalToActionsRequest(BaseModel):
+    goal: str = Field(min_length=5, max_length=500)
+    zone_id: str
+    base_world_id: str = "illinois_calumet_corridor_demo"
+
+
+class SuggestImprovementsRequest(BaseModel):
+    goal: str
+    zone_id: str
+    zone_name: str
+    actions: list[dict]
+    initial_metrics: dict
+    final_metrics: dict
+    projection_years: int = Field(ge=1, le=50)
+    sustainability_score: float
+    overall_outlook: str
+
+
+class GenerateReportRequest(BaseModel):
+    goal: str
+    zone_name: str
+    zone_type: str = "unknown"
+    actions: list[dict]
+    initial_metrics: dict
+    final_metrics: dict
+    projection_years: int = Field(ge=1, le=50)
+    sustainability_score: float
+    overall_outlook: str
+    ai_analysis: str = ""
