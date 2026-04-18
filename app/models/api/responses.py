@@ -3,7 +3,13 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from app.models.domain.action import AudienceType, SimulationMode
-from app.models.domain.planning import MitigationCommitment, PlanVerdict, PlannerProjectType
+from app.models.domain.planning import (
+    BuildSectionDefinition,
+    InfrastructureCategory,
+    MitigationCommitment,
+    PlanVerdict,
+    PlannerProjectType,
+)
 from app.models.domain.scenario_template import ScenarioTemplateAction
 from app.models.domain.simulation import CompactZoneSummary
 from app.models.domain.world import WorldState
@@ -158,6 +164,12 @@ class PlanningSiteResponse(BaseModel):
     state: str
     summary: str
     areas: list[PlanningAreaResponse]
+    build_sections: list[BuildSectionDefinition]
+
+
+class PlanningBuildOptionsResponse(BaseModel):
+    site_id: str
+    sections: list[BuildSectionDefinition]
 
 
 class PlannerSimulationActionResponse(BaseModel):
@@ -173,6 +185,9 @@ class PlannerSimulationInputsResponse(BaseModel):
     baseline_zone_id: str
     footprint_bucket: str
     traffic_bucket: str
+    resolved_project_type: PlannerProjectType
+    infrastructure_type: InfrastructureCategory | None
+    infrastructure_details: dict[str, str | int | float | bool]
     submitted_actions: list[PlannerSimulationActionResponse]
     mitigated_actions: list[PlannerSimulationActionResponse]
 
@@ -191,6 +206,8 @@ class ProposalAssessmentResponse(BaseModel):
     site_id: str
     area_id: str
     project_type: PlannerProjectType
+    infrastructure_type: InfrastructureCategory | None
+    infrastructure_details: dict[str, str | int | float | bool]
     footprint_acres: float
     estimated_daily_vehicle_trips: int
     buildout_years: int

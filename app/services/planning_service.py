@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from app.core.config import settings
 from app.core.constants import RiskLevel
 from app.models.api.responses import (
     PlanScorecardResponse,
+    PlanningBuildOptionsResponse,
     PlannerSimulationActionResponse,
     PlannerSimulationInputsResponse,
     PlanningAreaResponse,
@@ -14,7 +16,11 @@ from app.models.api.responses import (
 )
 from app.models.domain.action import SimulationAction, SimulationMode
 from app.models.domain.planning import (
+    BuildFieldDefinition,
+    BuildSectionDefinition,
+    InfrastructureCategory,
     MitigationCommitment,
+    PlanningFieldType,
     PlanningAreaDefinition,
     PlanningSiteDefinition,
     PlanVerdict,
@@ -63,6 +69,340 @@ TOP_RISK_MITIGATIONS = {
     "high temperature": "Require cooling surfaces, shade, and heat mitigation features.",
 }
 
+DEFAULT_BUILDOUT_YEARS = {
+    InfrastructureCategory.ROAD: 3,
+    InfrastructureCategory.BRIDGE: 4,
+    InfrastructureCategory.BUILDINGS: 3,
+    InfrastructureCategory.AIRPORT: 5,
+    InfrastructureCategory.GENERAL_AREA: 2,
+    InfrastructureCategory.SOLAR_PANEL: 2,
+}
+
+INFRASTRUCTURE_TO_PROJECT_TYPE = {
+    InfrastructureCategory.ROAD: PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+    InfrastructureCategory.BRIDGE: PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+    InfrastructureCategory.BUILDINGS: PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+    InfrastructureCategory.AIRPORT: PlannerProjectType.INDUSTRIAL_FACILITY,
+    InfrastructureCategory.GENERAL_AREA: PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+    InfrastructureCategory.SOLAR_PANEL: PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+}
+
+BUILD_SECTIONS = [
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.ROAD,
+        title="Road",
+        summary="Use this section for road segments, corridor widening, or logistics access roads.",
+        default_project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        fields=[
+            BuildFieldDefinition(
+                field_name="length_km",
+                label="Road length",
+                field_type=PlanningFieldType.NUMBER,
+                unit="km",
+                minimum=0.1,
+                maximum=200,
+                help_text="Total road length to build or expand.",
+            ),
+            BuildFieldDefinition(
+                field_name="lane_count",
+                label="Lane count",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=16,
+                help_text="Total number of lanes after the project is delivered.",
+            ),
+            BuildFieldDefinition(
+                field_name="paved_area_sq_m",
+                label="Paved area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=500,
+                maximum=5000000,
+                help_text="Estimated paved footprint. Use this if you already know the corridor area.",
+                required=False,
+            ),
+            BuildFieldDefinition(
+                field_name="daily_vehicle_trips",
+                label="Daily vehicle trips",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=50000,
+                help_text="Expected daily vehicle trips once the road is operating.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="How many years the project takes to build.",
+                required=False,
+            ),
+        ],
+    ),
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.BRIDGE,
+        title="Bridge",
+        summary="Use this section for bridges, flyovers, crossings, or elevated connectors.",
+        default_project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        fields=[
+            BuildFieldDefinition(
+                field_name="span_length_m",
+                label="Span length",
+                field_type=PlanningFieldType.NUMBER,
+                unit="m",
+                minimum=20,
+                maximum=5000,
+                help_text="Main bridge span length.",
+            ),
+            BuildFieldDefinition(
+                field_name="deck_width_m",
+                label="Deck width",
+                field_type=PlanningFieldType.NUMBER,
+                unit="m",
+                minimum=4,
+                maximum=120,
+                help_text="Full bridge width including lanes or paths.",
+            ),
+            BuildFieldDefinition(
+                field_name="approach_area_sq_m",
+                label="Approach area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=0,
+                maximum=5000000,
+                help_text="Associated approach and interchange area.",
+                required=False,
+            ),
+            BuildFieldDefinition(
+                field_name="daily_vehicle_trips",
+                label="Daily vehicle trips",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=50000,
+                help_text="Expected daily trips crossing the bridge.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="How many years the bridge work will take.",
+                required=False,
+            ),
+        ],
+    ),
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.BUILDINGS,
+        title="Buildings",
+        summary="Use this section for residential, commercial, industrial, or civic building clusters.",
+        default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        fields=[
+            BuildFieldDefinition(
+                field_name="building_count",
+                label="Building count",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=500,
+                help_text="Number of buildings in the proposal.",
+            ),
+            BuildFieldDefinition(
+                field_name="total_floor_area_sq_m",
+                label="Total floor area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=100,
+                maximum=10000000,
+                help_text="Combined floor area across all buildings.",
+            ),
+            BuildFieldDefinition(
+                field_name="site_area_sq_m",
+                label="Site area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=100,
+                maximum=10000000,
+                help_text="Total land area covered by the development site.",
+            ),
+            BuildFieldDefinition(
+                field_name="daily_vehicle_trips",
+                label="Daily vehicle trips",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=50000,
+                help_text="Expected daily vehicle trips generated by the site.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="Estimated delivery timeline for the building program.",
+                required=False,
+            ),
+        ],
+    ),
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.AIRPORT,
+        title="Airport",
+        summary="Use this section for airports, runway upgrades, freight aprons, or terminal expansion.",
+        default_project_type=PlannerProjectType.INDUSTRIAL_FACILITY,
+        fields=[
+            BuildFieldDefinition(
+                field_name="runway_length_m",
+                label="Runway length",
+                field_type=PlanningFieldType.NUMBER,
+                unit="m",
+                minimum=500,
+                maximum=5000,
+                help_text="Primary runway length.",
+            ),
+            BuildFieldDefinition(
+                field_name="runway_width_m",
+                label="Runway width",
+                field_type=PlanningFieldType.NUMBER,
+                unit="m",
+                minimum=20,
+                maximum=100,
+                help_text="Primary runway width.",
+            ),
+            BuildFieldDefinition(
+                field_name="terminal_area_sq_m",
+                label="Terminal area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=0,
+                maximum=5000000,
+                help_text="Terminal and passenger/service building area.",
+            ),
+            BuildFieldDefinition(
+                field_name="apron_area_sq_m",
+                label="Apron area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=0,
+                maximum=5000000,
+                help_text="Aircraft apron, taxi, and support paved area.",
+            ),
+            BuildFieldDefinition(
+                field_name="daily_vehicle_trips",
+                label="Daily vehicle trips",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=50000,
+                help_text="Expected daily landside traffic from the airport project.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="Estimated airport buildout duration.",
+                required=False,
+            ),
+        ],
+    ),
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.GENERAL_AREA,
+        title="General Area",
+        summary="Use this section for broad land conversion, district redevelopment, or site preparation studies.",
+        default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        fields=[
+            BuildFieldDefinition(
+                field_name="site_area_sq_m",
+                label="Site area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=100,
+                maximum=10000000,
+                help_text="Total area of the district or parcel under review.",
+            ),
+            BuildFieldDefinition(
+                field_name="impervious_surface_pct",
+                label="Impervious surface",
+                field_type=PlanningFieldType.NUMBER,
+                unit="percent",
+                minimum=0,
+                maximum=100,
+                help_text="Share of the site expected to become paved or hardscaped.",
+            ),
+            BuildFieldDefinition(
+                field_name="daily_vehicle_trips",
+                label="Daily vehicle trips",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=50000,
+                help_text="Expected daily traffic from the overall area plan.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="Expected timeline for the area plan buildout.",
+                required=False,
+            ),
+        ],
+    ),
+    BuildSectionDefinition(
+        infrastructure_type=InfrastructureCategory.SOLAR_PANEL,
+        title="Solar Panel",
+        summary="Use this section for ground-mounted solar fields, canopy installations, or solar-plus-storage sites.",
+        default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        fields=[
+            BuildFieldDefinition(
+                field_name="panel_field_area_sq_m",
+                label="Panel field area",
+                field_type=PlanningFieldType.NUMBER,
+                unit="sq m",
+                minimum=100,
+                maximum=10000000,
+                help_text="Total ground area covered by solar panels and support equipment.",
+            ),
+            BuildFieldDefinition(
+                field_name="capacity_mw",
+                label="Capacity",
+                field_type=PlanningFieldType.NUMBER,
+                unit="MW",
+                minimum=0.1,
+                maximum=5000,
+                help_text="Planned generation capacity.",
+            ),
+            BuildFieldDefinition(
+                field_name="battery_storage_mwh",
+                label="Battery storage",
+                field_type=PlanningFieldType.NUMBER,
+                unit="MWh",
+                minimum=0,
+                maximum=10000,
+                help_text="Optional battery storage capacity for the site.",
+                required=False,
+            ),
+            BuildFieldDefinition(
+                field_name="maintenance_vehicle_trips_per_day",
+                label="Maintenance trips per day",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=0,
+                maximum=5000,
+                help_text="Expected daily service and maintenance trips.",
+            ),
+            BuildFieldDefinition(
+                field_name="construction_years",
+                label="Construction years",
+                field_type=PlanningFieldType.INTEGER,
+                minimum=1,
+                maximum=25,
+                help_text="Expected delivery time for the solar installation.",
+                required=False,
+            ),
+        ],
+    ),
+]
+
 
 class PlanningService:
     def __init__(self) -> None:
@@ -98,6 +438,97 @@ class PlanningService:
                 return zone
         raise ValueError(f"Zone '{zone_id}' was not found.")
 
+    def get_build_options(self) -> PlanningBuildOptionsResponse:
+        return PlanningBuildOptionsResponse(site_id=self._site.site_id, sections=BUILD_SECTIONS)
+
+    def _get_build_section(self, infrastructure_type: InfrastructureCategory) -> BuildSectionDefinition:
+        for section in BUILD_SECTIONS:
+            if section.infrastructure_type == infrastructure_type:
+                return section
+        raise ValueError(f"Unsupported infrastructure_type '{infrastructure_type.value}'.")
+
+    def _coerce_numeric_value(self, value: Any, field_name: str) -> float:
+        if isinstance(value, bool):
+            raise ValueError(f"Field '{field_name}' must be a number.")
+        if isinstance(value, (int, float)):
+            return float(value)
+        raise ValueError(f"Field '{field_name}' must be a number.")
+
+    def _validate_infrastructure_details(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+    ) -> dict[str, str | int | float | bool]:
+        section = self._get_build_section(infrastructure_type)
+        normalized: dict[str, str | int | float | bool] = {}
+
+        for field in section.fields:
+            value = infrastructure_details.get(field.field_name)
+            if value is None:
+                if field.required:
+                    raise ValueError(
+                        f"Field '{field.field_name}' is required for infrastructure_type "
+                        f"'{infrastructure_type.value}'."
+                    )
+                continue
+
+            if field.field_type in {PlanningFieldType.NUMBER, PlanningFieldType.INTEGER}:
+                numeric_value = self._coerce_numeric_value(value, field.field_name)
+                if field.minimum is not None and numeric_value < field.minimum:
+                    raise ValueError(f"Field '{field.field_name}' must be >= {field.minimum}.")
+                if field.maximum is not None and numeric_value > field.maximum:
+                    raise ValueError(f"Field '{field.field_name}' must be <= {field.maximum}.")
+                if field.field_type == PlanningFieldType.INTEGER:
+                    normalized[field.field_name] = int(round(numeric_value))
+                else:
+                    normalized[field.field_name] = round(numeric_value, 2)
+            else:
+                normalized[field.field_name] = str(value).strip()
+
+        return normalized
+
+    def _sq_m_to_acres(self, area_sq_m: float) -> float:
+        return round(area_sq_m / 4046.8564224, 2)
+
+    def _resolve_infrastructure_inputs(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+    ) -> tuple[PlannerProjectType, dict[str, str | int | float | bool], float, int, int]:
+        details = self._validate_infrastructure_details(infrastructure_type, infrastructure_details)
+        project_type = INFRASTRUCTURE_TO_PROJECT_TYPE[infrastructure_type]
+
+        if infrastructure_type == InfrastructureCategory.ROAD:
+            paved_area_sq_m = float(
+                details.get("paved_area_sq_m", float(details["length_km"]) * 1000 * float(details["lane_count"]) * 3.5)
+            )
+            footprint_acres = self._sq_m_to_acres(paved_area_sq_m)
+            traffic = int(details["daily_vehicle_trips"])
+        elif infrastructure_type == InfrastructureCategory.BRIDGE:
+            bridge_area_sq_m = (float(details["span_length_m"]) * float(details["deck_width_m"])) + float(
+                details.get("approach_area_sq_m", 0)
+            )
+            footprint_acres = self._sq_m_to_acres(bridge_area_sq_m)
+            traffic = int(details["daily_vehicle_trips"])
+        elif infrastructure_type == InfrastructureCategory.BUILDINGS:
+            footprint_acres = self._sq_m_to_acres(float(details["site_area_sq_m"]))
+            traffic = int(details["daily_vehicle_trips"])
+        elif infrastructure_type == InfrastructureCategory.AIRPORT:
+            runway_area_sq_m = float(details["runway_length_m"]) * float(details["runway_width_m"])
+            airport_area_sq_m = runway_area_sq_m + float(details["terminal_area_sq_m"]) + float(details["apron_area_sq_m"])
+            footprint_acres = self._sq_m_to_acres(airport_area_sq_m)
+            traffic = int(details["daily_vehicle_trips"])
+        elif infrastructure_type == InfrastructureCategory.GENERAL_AREA:
+            developed_area_sq_m = float(details["site_area_sq_m"]) * (float(details["impervious_surface_pct"]) / 100.0)
+            footprint_acres = self._sq_m_to_acres(developed_area_sq_m or float(details["site_area_sq_m"]))
+            traffic = int(details["daily_vehicle_trips"])
+        else:
+            footprint_acres = self._sq_m_to_acres(float(details["panel_field_area_sq_m"]))
+            traffic = int(details["maintenance_vehicle_trips_per_day"])
+
+        buildout_years = int(details.get("construction_years", DEFAULT_BUILDOUT_YEARS[infrastructure_type]))
+        return project_type, details, footprint_acres, traffic, buildout_years
+
     def get_site(self) -> PlanningSiteResponse:
         areas = []
         for area in self._site.areas:
@@ -119,6 +550,7 @@ class PlanningService:
             state=self._site.state,
             summary=self._site.summary,
             areas=areas,
+            build_sections=BUILD_SECTIONS,
         )
 
     def _bucket_footprint(self, footprint_acres: float) -> tuple[str, float]:
@@ -283,26 +715,49 @@ class PlanningService:
         self,
         site_id: str,
         area_id: str,
-        project_type: PlannerProjectType,
-        footprint_acres: float,
-        estimated_daily_vehicle_trips: int,
-        buildout_years: int,
+        project_type: PlannerProjectType | None,
+        infrastructure_type: InfrastructureCategory | None,
+        infrastructure_details: dict[str, Any] | None,
+        footprint_acres: float | None,
+        estimated_daily_vehicle_trips: int | None,
+        buildout_years: int | None,
         mitigation_commitment: MitigationCommitment,
         planner_notes: str | None = None,
     ) -> ProposalAssessmentResponse:
         self._validate_site(site_id)
         area = self._get_area(area_id)
-        self._validate_project_type(area, project_type)
+
+        normalized_infrastructure_details: dict[str, str | int | float | bool] = {}
+        if infrastructure_type is not None:
+            (
+                resolved_project_type,
+                normalized_infrastructure_details,
+                resolved_footprint_acres,
+                resolved_estimated_daily_vehicle_trips,
+                resolved_buildout_years,
+            ) = self._resolve_infrastructure_inputs(infrastructure_type, infrastructure_details or {})
+        else:
+            if project_type is None or footprint_acres is None or estimated_daily_vehicle_trips is None or buildout_years is None:
+                raise ValueError(
+                    "Legacy proposal mode requires project_type, footprint_acres, estimated_daily_vehicle_trips, "
+                    "and buildout_years."
+                )
+            resolved_project_type = project_type
+            resolved_footprint_acres = footprint_acres
+            resolved_estimated_daily_vehicle_trips = estimated_daily_vehicle_trips
+            resolved_buildout_years = buildout_years
+
+        self._validate_project_type(area, resolved_project_type)
 
         world = world_service.get_world()
-        footprint_bucket, footprint_intensity = self._bucket_footprint(footprint_acres)
-        traffic_bucket, traffic_intensity = self._bucket_traffic(estimated_daily_vehicle_trips)
+        footprint_bucket, footprint_intensity = self._bucket_footprint(resolved_footprint_acres)
+        traffic_bucket, traffic_intensity = self._bucket_traffic(resolved_estimated_daily_vehicle_trips)
 
         submitted_action_inputs, submitted_simulation_actions = self._normalize_actions(
             self._build_actions(
                 area=area,
-                project_type=project_type,
-                buildout_years=buildout_years,
+                project_type=resolved_project_type,
+                buildout_years=resolved_buildout_years,
                 footprint_intensity=footprint_intensity,
                 traffic_intensity=traffic_intensity,
                 mitigation_commitment=mitigation_commitment,
@@ -311,8 +766,8 @@ class PlanningService:
         mitigated_action_inputs, mitigated_simulation_actions = self._normalize_actions(
             self._build_actions(
                 area=area,
-                project_type=project_type,
-                buildout_years=buildout_years,
+                project_type=resolved_project_type,
+                buildout_years=resolved_buildout_years,
                 footprint_intensity=footprint_intensity,
                 traffic_intensity=traffic_intensity,
                 mitigation_commitment=MitigationCommitment.HIGH,
@@ -351,10 +806,12 @@ class PlanningService:
         return ProposalAssessmentResponse(
             site_id=site_id,
             area_id=area_id,
-            project_type=project_type,
-            footprint_acres=round(footprint_acres, 2),
-            estimated_daily_vehicle_trips=estimated_daily_vehicle_trips,
-            buildout_years=buildout_years,
+            project_type=resolved_project_type,
+            infrastructure_type=infrastructure_type,
+            infrastructure_details=normalized_infrastructure_details,
+            footprint_acres=round(resolved_footprint_acres, 2),
+            estimated_daily_vehicle_trips=resolved_estimated_daily_vehicle_trips,
+            buildout_years=resolved_buildout_years,
             mitigation_commitment=mitigation_commitment,
             planner_notes=planner_notes,
             submitted_plan=self._build_scorecard(area, submitted_projection, submitted_action_inputs),
@@ -366,6 +823,9 @@ class PlanningService:
                 baseline_zone_id=area.baseline_zone_id,
                 footprint_bucket=footprint_bucket,
                 traffic_bucket=traffic_bucket,
+                resolved_project_type=resolved_project_type,
+                infrastructure_type=infrastructure_type,
+                infrastructure_details=normalized_infrastructure_details,
                 submitted_actions=[
                     PlannerSimulationActionResponse.model_validate(action) for action in submitted_action_inputs
                 ],

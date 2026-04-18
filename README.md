@@ -40,12 +40,18 @@ The planner chooses one of three proposal areas:
 - `river_buffer_redevelopment`
 
 The planner then submits:
-- `project_type`
-- `footprint_acres`
-- `estimated_daily_vehicle_trips`
-- `buildout_years`
+- `infrastructure_type`
+- infrastructure-specific detail fields such as runway size, bridge span, road lanes, building floor area, site area, or solar field area
 - `mitigation_commitment`
 - optional `planner_notes`
+
+The backend exposes build sections for:
+- `road`
+- `bridge`
+- `buildings`
+- `airport`
+- `general_area`
+- `solar_panel`
 
 The backend maps that brief into deterministic simulation actions, runs the submitted plan and a stronger mitigated plan, then returns a scorecard for both.
 
@@ -155,6 +161,18 @@ Example:
 curl http://127.0.0.1:8000/api/v1/planning/site
 ```
 
+### Get Build Section Metadata
+
+`GET /api/v1/planning/build-options`
+
+Returns the build sections and the custom fields each section needs. This is the best endpoint for driving the frontend form builder.
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/planning/build-options
+```
+
 ### Assess a Proposal
 
 `POST /api/v1/planning/proposals/assess`
@@ -164,7 +182,7 @@ Example:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/planning/proposals/assess ^
   -H "Content-Type: application/json" ^
-  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"project_type\":\"industrial_facility\",\"footprint_acres\":45,\"estimated_daily_vehicle_trips\":2600,\"buildout_years\":4,\"mitigation_commitment\":\"low\",\"planner_notes\":\"Freight-oriented advanced manufacturing campus.\"}"
+  -d "{\"site_id\":\"illinois_calumet_corridor_demo\",\"area_id\":\"calumet_industrial_strip\",\"infrastructure_type\":\"airport\",\"infrastructure_details\":{\"runway_length_m\":2400,\"runway_width_m\":45,\"terminal_area_sq_m\":18000,\"apron_area_sq_m\":42000,\"daily_vehicle_trips\":3200,\"construction_years\":5},\"mitigation_commitment\":\"medium\",\"planner_notes\":\"Regional cargo airport expansion.\"}"
 ```
 
 Response shape:
@@ -174,10 +192,19 @@ Response shape:
   "site_id": "illinois_calumet_corridor_demo",
   "area_id": "calumet_industrial_strip",
   "project_type": "industrial_facility",
-  "footprint_acres": 45.0,
-  "estimated_daily_vehicle_trips": 2600,
-  "buildout_years": 4,
-  "mitigation_commitment": "low",
+  "infrastructure_type": "airport",
+  "infrastructure_details": {
+    "runway_length_m": 2400,
+    "runway_width_m": 45,
+    "terminal_area_sq_m": 18000,
+    "apron_area_sq_m": 42000,
+    "daily_vehicle_trips": 3200,
+    "construction_years": 5
+  },
+  "footprint_acres": 39.29,
+  "estimated_daily_vehicle_trips": 3200,
+  "buildout_years": 5,
+  "mitigation_commitment": "medium",
   "submitted_plan": {
     "plan_score": 41.23,
     "verdict": "conditional",
@@ -221,6 +248,16 @@ Response shape:
     "baseline_zone_id": "zone_calumet_industrial_strip",
     "footprint_bucket": "large",
     "traffic_bucket": "high",
+    "resolved_project_type": "industrial_facility",
+    "infrastructure_type": "airport",
+    "infrastructure_details": {
+      "runway_length_m": 2400,
+      "runway_width_m": 45,
+      "terminal_area_sq_m": 18000,
+      "apron_area_sq_m": 42000,
+      "daily_vehicle_trips": 3200,
+      "construction_years": 5
+    },
     "submitted_actions": [],
     "mitigated_actions": []
   }

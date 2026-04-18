@@ -11,6 +11,21 @@ class PlannerProjectType(str, Enum):
     MIXED_USE_REDEVELOPMENT = "mixed_use_redevelopment"
 
 
+class InfrastructureCategory(str, Enum):
+    ROAD = "road"
+    BRIDGE = "bridge"
+    BUILDINGS = "buildings"
+    AIRPORT = "airport"
+    GENERAL_AREA = "general_area"
+    SOLAR_PANEL = "solar_panel"
+
+
+class PlanningFieldType(str, Enum):
+    NUMBER = "number"
+    INTEGER = "integer"
+    TEXT = "text"
+
+
 class MitigationCommitment(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -21,6 +36,25 @@ class PlanVerdict(str, Enum):
     RECOMMENDED = "recommended"
     CONDITIONAL = "conditional"
     NOT_RECOMMENDED = "not_recommended"
+
+
+class BuildFieldDefinition(BaseModel):
+    field_name: str
+    label: str
+    field_type: PlanningFieldType
+    unit: str | None = None
+    required: bool = True
+    minimum: float | None = None
+    maximum: float | None = None
+    help_text: str
+
+
+class BuildSectionDefinition(BaseModel):
+    infrastructure_type: InfrastructureCategory
+    title: str
+    summary: str
+    default_project_type: PlannerProjectType
+    fields: list[BuildFieldDefinition]
 
 
 class PlanningAreaDefinition(BaseModel):

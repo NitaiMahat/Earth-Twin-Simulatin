@@ -22,6 +22,26 @@ def test_get_planning_site_returns_illinois_site_metadata() -> None:
     assert len(payload["areas"]) == 3
     assert payload["areas"][0]["baseline_zone_id"].startswith("zone_")
     assert "industrial_facility" in payload["areas"][0]["allowed_project_types"]
+    assert len(payload["build_sections"]) == 6
+
+
+def test_get_build_options_returns_section_specific_fields() -> None:
+    response = client.get("/api/v1/planning/build-options")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["site_id"] == "illinois_calumet_corridor_demo"
+    assert len(payload["sections"]) == 6
+
+    airport_section = next(
+        section for section in payload["sections"] if section["infrastructure_type"] == "airport"
+    )
+    field_names = [field["field_name"] for field in airport_section["fields"]]
+
+    assert "runway_length_m" in field_names
+    assert "runway_width_m" in field_names
+    assert "terminal_area_sq_m" in field_names
+    assert "apron_area_sq_m" in field_names
 
 
 def test_assess_proposal_returns_scorecards_and_simulation_inputs() -> None:
@@ -51,6 +71,38 @@ def test_assess_proposal_returns_scorecards_and_simulation_inputs() -> None:
     assert len(payload["simulation_inputs"]["submitted_actions"]) == 2
     assert len(payload["simulation_inputs"]["mitigated_actions"]) >= 3
     assert payload["simulation_inputs"]["submitted_actions"][0]["normalized_action_type"] == "pollution_spike"
+
+
+def test_assess_proposal_accepts_infrastructure_specific_airport_details() -> None:
+    client.post("/api/v1/world/reset")
+    response = client.post(
+        "/api/v1/planning/proposals/assess",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "calumet_industrial_strip",
+            "infrastructure_type": "airport",
+            "infrastructure_details": {
+                "runway_length_m": 2400,
+                "runway_width_m": 45,
+                "terminal_area_sq_m": 18000,
+                "apron_area_sq_m": 42000,
+                "daily_vehicle_trips": 3200,
+                "construction_years": 5
+            },
+            "mitigation_commitment": "medium",
+            "planner_notes": "Regional cargo airport expansion."
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["infrastructure_type"] == "airport"
+    assert payload["project_type"] == "industrial_facility"
+    assert payload["buildout_years"] == 5
+    assert payload["estimated_daily_vehicle_trips"] == 3200
+    assert payload["footprint_acres"] > 0
+    assert payload["simulation_inputs"]["resolved_project_type"] == "industrial_facility"
+    assert payload["simulation_inputs"]["infrastructure_details"]["runway_length_m"] == 2400
 
 
 def test_assess_proposal_rejects_unknown_site_and_disallowed_project_type() -> None:
@@ -102,12 +154,33 @@ def test_assess_proposal_validates_numeric_ranges() -> None:
     assert response.status_code == 422
 
 
+def test_assess_proposal_rejects_missing_required_infrastructure_fields() -> None:
+    client.post("/api/v1/world/reset")
+    response = client.post(
+        "/api/v1/planning/proposals/assess",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "calumet_industrial_strip",
+            "infrastructure_type": "airport",
+            "infrastructure_details": {
+                "runway_length_m": 2400,
+                "daily_vehicle_trips": 3200
+            },
+            "mitigation_commitment": "medium"
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_planning_service_maps_project_type_and_mitigation_commitment_deterministically() -> None:
     client.post("/api/v1/world/reset")
     low_commitment = planning_service.assess_proposal(
         site_id="illinois_calumet_corridor_demo",
         area_id="arterial_infill_corridor",
         project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        infrastructure_type=None,
+        infrastructure_details={},
         footprint_acres=12,
         estimated_daily_vehicle_trips=1500,
         buildout_years=3,
@@ -117,6 +190,8 @@ def test_planning_service_maps_project_type_and_mitigation_commitment_determinis
         site_id="illinois_calumet_corridor_demo",
         area_id="arterial_infill_corridor",
         project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        infrastructure_type=None,
+        infrastructure_details={},
         footprint_acres=12,
         estimated_daily_vehicle_trips=1500,
         buildout_years=3,
