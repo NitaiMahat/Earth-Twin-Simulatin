@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,6 +11,17 @@ class Settings:
     app_version: str = "0.1.0"
     api_v1_prefix: str = "/api/v1"
     llm_explanations_enabled: bool = False
+    cors_origins_raw: str = os.getenv("CORS_ORIGINS", "*")
+    port: int = int(os.getenv("PORT", "8000"))
+
+    @property
+    def cors_origins(self) -> list[str]:
+        normalized_value = self.cors_origins_raw.strip()
+        if not normalized_value:
+            return []
+        if normalized_value == "*":
+            return ["*"]
+        return [origin.strip() for origin in normalized_value.split(",") if origin.strip()]
 
     @property
     def base_dir(self) -> Path:

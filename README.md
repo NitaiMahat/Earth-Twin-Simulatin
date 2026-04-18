@@ -95,6 +95,52 @@ Base URL:
 Interactive docs:
 - `http://127.0.0.1:8000/docs`
 
+## Deployment
+
+This backend is ready for GitHub-based deployment on platforms like Render and Koyeb.
+
+Included deploy files:
+- `render.yaml`
+- `Procfile`
+- `runtime.txt`
+
+Important runtime settings:
+- `PORT`
+  - Set by most hosts automatically
+- `CORS_ORIGINS`
+  - Default is `*` for demo friendliness
+  - For a tighter setup, set a comma-separated list such as:
+  - `https://your-frontend.vercel.app,http://localhost:3000`
+
+Health check path:
+- `/api/v1/health`
+
+### Fastest Free Path: Render
+
+Render currently documents free web services for testing and hobby use:
+- https://render.com/docs/free
+- https://render.com/docs/deploy-fastapi
+
+Steps:
+1. Open Render and create a new Web Service from your GitHub repo.
+2. Select this repository and branch `main`.
+3. Render can use the included `render.yaml`, or you can enter:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. Set `CORS_ORIGINS` to your frontend URLs.
+5. Deploy and share the generated `onrender.com` URL with the frontend team.
+
+### Free Alternative: Koyeb
+
+Koyeb currently documents FastAPI deployment and a free starter tier:
+- https://www.koyeb.com/docs/deploy/fastapi
+- https://www.koyeb.com/pricing/
+
+Use:
+- Run command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Port: `8000`
+- Health path: `/api/v1/health`
+
 ## Main Planner Endpoints
 
 ### Get Site Metadata
@@ -242,3 +288,4 @@ Legacy labels still supported:
 - The planner flow is the recommended starting point in `/docs`.
 - The world remains in memory only; restart the app or call `/api/v1/world/reset` to restore seed values.
 - The raw simulation endpoints are still available for debugging and demos, but they expose lower-level actions than the planner scorecard flow.
+- For browser frontend access, set `CORS_ORIGINS` to the frontend domains before sharing the deployment URL.
