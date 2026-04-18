@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from app.models.api.requests import ProposalAssessmentRequest
-from app.models.api.responses import PlanningSiteResponse, ProposalAssessmentResponse
+from app.models.api.responses import PlanningBuildOptionsResponse, PlanningSiteResponse, ProposalAssessmentResponse
 from app.services.planning_service import planning_service
 
 router = APIRouter(prefix="/planning", tags=["planning"])
@@ -14,6 +14,11 @@ def get_planning_site() -> PlanningSiteResponse:
     return planning_service.get_site()
 
 
+@router.get("/build-options", response_model=PlanningBuildOptionsResponse)
+def get_build_options() -> PlanningBuildOptionsResponse:
+    return planning_service.get_build_options()
+
+
 @router.post("/proposals/assess", response_model=ProposalAssessmentResponse)
 def assess_proposal(payload: ProposalAssessmentRequest) -> ProposalAssessmentResponse:
     try:
@@ -21,6 +26,8 @@ def assess_proposal(payload: ProposalAssessmentRequest) -> ProposalAssessmentRes
             site_id=payload.site_id,
             area_id=payload.area_id,
             project_type=payload.project_type,
+            infrastructure_type=payload.infrastructure_type,
+            infrastructure_details=payload.infrastructure_details,
             footprint_acres=payload.footprint_acres,
             estimated_daily_vehicle_trips=payload.estimated_daily_vehicle_trips,
             buildout_years=payload.buildout_years,

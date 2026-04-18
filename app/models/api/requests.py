@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.domain.action import AudienceType, SimulationMode
-from app.models.domain.planning import MitigationCommitment, PlannerProjectType
+from app.models.domain.planning import InfrastructureCategory, MitigationCommitment, PlannerProjectType
 
 
 class ApplyActionRequest(BaseModel):
@@ -68,9 +70,28 @@ class CompareScenariosRequest(BaseModel):
 class ProposalAssessmentRequest(BaseModel):
     site_id: str
     area_id: str
-    project_type: PlannerProjectType
-    footprint_acres: float = Field(gt=0, le=5000)
-    estimated_daily_vehicle_trips: int = Field(ge=0, le=50000)
-    buildout_years: int = Field(ge=1, le=25)
+    project_type: PlannerProjectType | None = None
+    infrastructure_type: InfrastructureCategory | None = None
+    infrastructure_details: dict[str, Any] = Field(default_factory=dict)
+    footprint_acres: float | None = Field(default=None, gt=0, le=5000)
+    estimated_daily_vehicle_trips: int | None = Field(default=None, ge=0, le=50000)
+    buildout_years: int | None = Field(default=None, ge=1, le=25)
     mitigation_commitment: MitigationCommitment
     planner_notes: str | None = None
+
+    @model_validator(mode="after")
+    def validate_assessment_mode(self) -> "ProposalAssessmentRequest":
+        uses_infrastructure_flow = self.infrastructure_type is not None
+        uses_legacy_flow = (
+            self.project_type is not None
+            and self.footprint_acres is not None
+            and self.estimated_daily_vehicle_trips is not None
+            and self.buildout_years is not None
+        )
+
+        if not uses_infrastructure_flow and not uses_legacy_flow:
+            raise ValueError(
+                "Provide either infrastructure_type with infrastructure_details, or project_type with "
+                "footprint_acres, estimated_daily_vehicle_trips, and buildout_years."
+            )
+        return self
