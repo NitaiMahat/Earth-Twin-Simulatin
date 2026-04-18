@@ -4,6 +4,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv  # type: ignore[import]
+    load_dotenv()
+except ImportError:
+    pass
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -13,6 +19,7 @@ class Settings:
     llm_explanations_enabled: bool = False
     cors_origins_raw: str = os.getenv("CORS_ORIGINS", "*")
     port: int = int(os.getenv("PORT", "8000"))
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
 
     @property
     def cors_origins(self) -> list[str]:

@@ -240,3 +240,19 @@ class ProposalAssessmentResponse(BaseModel):
     recommended_option: str
     comparison_summary: str
     simulation_inputs: PlannerSimulationInputsResponse
+
+
+class GoalActionItem(BaseModel):
+    action_type: str
+    intensity: float
+    duration_years: int
+
+
+class GoalToActionsResponse(BaseModel):
+    goal: str
+    zone_id: str
+    actions: list[GoalActionItem]
+
+
+class SuggestImprovementsResponse(BaseModel):
+    analysis: str
