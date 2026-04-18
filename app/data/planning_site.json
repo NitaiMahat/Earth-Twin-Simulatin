@@ -1,0 +1,38 @@
+{
+  "site_id": "illinois_calumet_corridor_demo",
+  "name": "Illinois Calumet Corridor Demo",
+  "state": "Illinois",
+  "summary": "Planner-facing demo site focused on redevelopment tradeoffs across a Chicago industrial corridor. Users choose one preconfigured parcel, enter a project brief, and compare the submitted plan against an auto-mitigated alternative.",
+  "areas": [
+    {
+      "area_id": "calumet_industrial_strip",
+      "name": "Calumet Industrial Strip",
+      "baseline_zone_id": "zone_calumet_industrial_strip",
+      "planning_notes": "Heavy industrial parcel near existing freight activity with elevated emissions and ecosystem stress.",
+      "allowed_project_types": [
+        "industrial_facility",
+        "roadway_logistics_expansion"
+      ]
+    },
+    {
+      "area_id": "arterial_infill_corridor",
+      "name": "Arterial Infill Corridor",
+      "baseline_zone_id": "zone_arterial_infill_corridor",
+      "planning_notes": "Urban corridor where logistics demand, traffic growth, and neighborhood heat stress compete for limited right of way.",
+      "allowed_project_types": [
+        "roadway_logistics_expansion",
+        "mixed_use_redevelopment"
+      ]
+    },
+    {
+      "area_id": "river_buffer_redevelopment",
+      "name": "River Buffer Redevelopment",
+      "baseline_zone_id": "zone_river_buffer_redevelopment",
+      "planning_notes": "River-edge parcel suited for mixed-use redevelopment but sensitive to habitat disruption and loss of green buffers.",
+      "allowed_project_types": [
+        "mixed_use_redevelopment",
+        "roadway_logistics_expansion"
+      ]
+    }
+  ]
+}

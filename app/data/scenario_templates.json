@@ -1,0 +1,190 @@
+[
+  {
+    "template_id": "new_industrial_corridor",
+    "name": "New Industrial Corridor",
+    "mode": "planning",
+    "description": "Model the environmental cost of expanding industrial activity alongside existing urban pressure.",
+    "recommended_audience": "planner",
+    "default_projection_years": 5,
+    "default_actions": [
+      {
+        "zone_id": "zone_calumet_industrial_strip",
+        "action_type": "industrial_expansion",
+        "intensity": 0.8,
+        "duration_years": 3
+      },
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "expand_roadway",
+        "intensity": 0.6,
+        "duration_years": 2
+      }
+    ],
+    "objective": "Evaluate how industrial growth shifts pollution, heat, and ecological risk across the system.",
+    "product_focus": "Helps planners weigh economic development against long-term resilience costs.",
+    "difficulty": "medium"
+  },
+  {
+    "template_id": "road_expansion_plan",
+    "name": "Road Expansion Plan",
+    "mode": "planning",
+    "description": "Test the environmental tradeoffs of roadway expansion and related land-use pressure.",
+    "recommended_audience": "municipality",
+    "default_projection_years": 5,
+    "default_actions": [
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "expand_roadway",
+        "intensity": 0.9,
+        "duration_years": 3
+      },
+      {
+        "zone_id": "zone_calumet_habitat_reserve",
+        "action_type": "reduce_green_space",
+        "intensity": 0.4,
+        "duration_years": 2
+      }
+    ],
+    "objective": "Compare transport capacity gains against rising congestion, heat, and green-space loss.",
+    "product_focus": "Helps municipalities assess whether road-led growth creates hidden environmental liabilities.",
+    "difficulty": "medium"
+  },
+  {
+    "template_id": "green_restoration_plan",
+    "name": "Green Restoration Plan",
+    "mode": "planning",
+    "description": "Explore how a restoration-led plan improves resilience in vulnerable zones.",
+    "recommended_audience": "planner",
+    "default_projection_years": 6,
+    "default_actions": [
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "add_urban_park",
+        "intensity": 0.8,
+        "duration_years": 3
+      },
+      {
+        "zone_id": "zone_river_buffer_redevelopment",
+        "action_type": "restoration_corridor",
+        "intensity": 0.7,
+        "duration_years": 4
+      }
+    ],
+    "objective": "Estimate how green infrastructure and habitat restoration change long-term environmental performance.",
+    "product_focus": "Helps planning teams justify restoration investment with measurable system benefits.",
+    "difficulty": "easy"
+  },
+  {
+    "template_id": "transit_first_redevelopment",
+    "name": "Transit-First Redevelopment",
+    "mode": "planning",
+    "description": "Test whether cleaner mobility plus urban greening outperforms road-first redevelopment.",
+    "recommended_audience": "municipality",
+    "default_projection_years": 5,
+    "default_actions": [
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "improve_public_transit",
+        "intensity": 0.9,
+        "duration_years": 4
+      },
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "add_urban_park",
+        "intensity": 0.5,
+        "duration_years": 3
+      }
+    ],
+    "objective": "Assess whether lower-impact redevelopment improves sustainability while limiting future risk.",
+    "product_focus": "Helps cities compare transit-led mitigation with more conventional expansion plans.",
+    "difficulty": "easy"
+  },
+  {
+    "template_id": "deforestation_crisis",
+    "name": "Deforestation Crisis",
+    "mode": "learning",
+    "description": "Show how rapid tree loss changes biodiversity, heat, and ecological recovery.",
+    "recommended_audience": "student",
+    "default_projection_years": 4,
+    "default_actions": [
+      {
+        "zone_id": "zone_calumet_habitat_reserve",
+        "action_type": "cut_trees",
+        "intensity": 0.9,
+        "duration_years": 3
+      }
+    ],
+    "objective": "Teach how forest loss affects habitat stability and environmental resilience.",
+    "product_focus": "Helps students connect tree cover to biodiversity and heat regulation.",
+    "difficulty": "easy"
+  },
+  {
+    "template_id": "urban_heat_island",
+    "name": "Urban Heat Island",
+    "mode": "learning",
+    "description": "Demonstrate how traffic, pollution, and reduced green space intensify city heat stress.",
+    "recommended_audience": "educator",
+    "default_projection_years": 5,
+    "default_actions": [
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "increase_traffic",
+        "intensity": 0.8,
+        "duration_years": 4
+      },
+      {
+        "zone_id": "zone_arterial_infill_corridor",
+        "action_type": "increase_pollution",
+        "intensity": 0.6,
+        "duration_years": 3
+      }
+    ],
+    "objective": "Teach why dense urban zones can trap heat and accumulate environmental stress.",
+    "product_focus": "Helps classrooms explain the links between traffic, emissions, and urban temperature.",
+    "difficulty": "medium"
+  },
+  {
+    "template_id": "coastal_pollution_stress",
+    "name": "Coastal Pollution Stress",
+    "mode": "learning",
+    "description": "Explore how pollution shock affects a coastal zone over time.",
+    "recommended_audience": "student",
+    "default_projection_years": 5,
+    "default_actions": [
+      {
+        "zone_id": "zone_river_buffer_redevelopment",
+        "action_type": "increase_pollution",
+        "intensity": 0.9,
+        "duration_years": 3
+      }
+    ],
+    "objective": "Teach how pollution can disrupt coastal ecosystem stability and raise future risk.",
+    "product_focus": "Helps learners connect pollution events to long-term ecosystem decline.",
+    "difficulty": "easy"
+  },
+  {
+    "template_id": "restore_ecosystem_challenge",
+    "name": "Restore the Ecosystem Challenge",
+    "mode": "learning",
+    "description": "Challenge learners to use restoration actions to improve sustainability in stressed zones.",
+    "recommended_audience": "educator",
+    "default_projection_years": 6,
+    "default_actions": [
+      {
+        "zone_id": "zone_calumet_industrial_strip",
+        "action_type": "restore_ecosystem",
+        "intensity": 0.7,
+        "duration_years": 4
+      },
+      {
+        "zone_id": "zone_river_buffer_redevelopment",
+        "action_type": "restore_ecosystem",
+        "intensity": 0.5,
+        "duration_years": 3
+      }
+    ],
+    "objective": "Teach how restoration can offset some environmental damage, even in high-stress areas.",
+    "product_focus": "Helps students experiment with recovery strategies and compare outcomes.",
+    "difficulty": "medium"
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "world_id": "illinois_calumet_corridor_demo",
+  "name": "Illinois Calumet Corridor Demo",
+  "current_year": 2026,
+  "global_temperature": 15.2,
+  "global_co2_index": 421.5,
+  "zones": [
+    {
+      "zone_id": "zone_calumet_habitat_reserve",
+      "name": "Calumet Habitat Reserve",
+      "type": "wetland",
+      "tree_cover": 82,
+      "biodiversity_score": 86,
+      "pollution_level": 17,
+      "traffic_level": 14,
+      "temperature": 20.1,
+      "ecosystem_health": 83,
+      "risk_level": "low"
+    },
+    {
+      "zone_id": "zone_arterial_infill_corridor",
+      "name": "Arterial Infill Corridor",
+      "type": "city",
+      "tree_cover": 18,
+      "biodiversity_score": 42,
+      "pollution_level": 55,
+      "traffic_level": 76,
+      "temperature": 27.4,
+      "ecosystem_health": 47,
+      "risk_level": "high"
+    },
+    {
+      "zone_id": "zone_calumet_industrial_strip",
+      "name": "Calumet Industrial Strip",
+      "type": "industrial",
+      "tree_cover": 8,
+      "biodiversity_score": 31,
+      "pollution_level": 73,
+      "traffic_level": 61,
+      "temperature": 29.3,
+      "ecosystem_health": 34,
+      "risk_level": "critical"
+    },
+    {
+      "zone_id": "zone_river_buffer_redevelopment",
+      "name": "River Buffer Redevelopment",
+      "type": "coastal",
+      "tree_cover": 37,
+      "biodiversity_score": 64,
+      "pollution_level": 31,
+      "traffic_level": 27,
+      "temperature": 24.3,
+      "ecosystem_health": 65,
+      "risk_level": "medium"
+    }
+  ]
+}
