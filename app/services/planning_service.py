@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from app.core.config import settings
 from app.core.constants import RiskLevel
 from app.models.api.responses import (
+    GeometryLocationSummaryResponse,
+    GeometryResolutionResponse,
     PlanScorecardResponse,
     PlanningBuildOptionsResponse,
     PlannerSimulationActionResponse,
@@ -18,8 +21,11 @@ from app.models.domain.action import SimulationAction, SimulationMode
 from app.models.domain.planning import (
     BuildFieldDefinition,
     BuildSectionDefinition,
+    GeometryPoint,
+    GeometrySelectionMode,
     InfrastructureCategory,
     MitigationCommitment,
+    MapToolDefinition,
     PlanningFieldType,
     PlanningAreaDefinition,
     PlanningSiteDefinition,
@@ -93,6 +99,13 @@ BUILD_SECTIONS = [
         title="Road",
         summary="Use this section for road segments, corridor widening, or logistics access roads.",
         default_project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.LINE,
+            min_points=2,
+            max_points=2,
+            instructions="Click a road start point, then click the end point. The backend derives road length automatically.",
+            auto_derived_fields=["length_km"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="length_km",
@@ -145,6 +158,13 @@ BUILD_SECTIONS = [
         title="Bridge",
         summary="Use this section for bridges, flyovers, crossings, or elevated connectors.",
         default_project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.LINE,
+            min_points=2,
+            max_points=2,
+            instructions="Click the bridge start point, then the end point. The backend derives span length automatically.",
+            auto_derived_fields=["span_length_m"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="span_length_m",
@@ -198,6 +218,13 @@ BUILD_SECTIONS = [
         title="Buildings",
         summary="Use this section for residential, commercial, industrial, or civic building clusters.",
         default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.POLYGON,
+            min_points=3,
+            max_points=12,
+            instructions="Click the site corners in order to draw the building site boundary. The backend derives site area automatically.",
+            auto_derived_fields=["site_area_sq_m"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="building_count",
@@ -249,6 +276,13 @@ BUILD_SECTIONS = [
         title="Airport",
         summary="Use this section for airports, runway upgrades, freight aprons, or terminal expansion.",
         default_project_type=PlannerProjectType.INDUSTRIAL_FACILITY,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.LINE,
+            min_points=2,
+            max_points=2,
+            instructions="Click the runway start point, then the runway end point. The backend derives runway length automatically.",
+            auto_derived_fields=["runway_length_m"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="runway_length_m",
@@ -310,6 +344,13 @@ BUILD_SECTIONS = [
         title="General Area",
         summary="Use this section for broad land conversion, district redevelopment, or site preparation studies.",
         default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.POLYGON,
+            min_points=3,
+            max_points=16,
+            instructions="Click the site corners to draw the general project area. The backend derives total site area automatically.",
+            auto_derived_fields=["site_area_sq_m"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="site_area_sq_m",
@@ -353,6 +394,13 @@ BUILD_SECTIONS = [
         title="Solar Panel",
         summary="Use this section for ground-mounted solar fields, canopy installations, or solar-plus-storage sites.",
         default_project_type=PlannerProjectType.MIXED_USE_REDEVELOPMENT,
+        map_tool=MapToolDefinition(
+            selection_mode=GeometrySelectionMode.POLYGON,
+            min_points=3,
+            max_points=16,
+            instructions="Click the solar field corners to draw the panel boundary. The backend derives panel field area automatically.",
+            auto_derived_fields=["panel_field_area_sq_m"],
+        ),
         fields=[
             BuildFieldDefinition(
                 field_name="panel_field_area_sq_m",
@@ -446,6 +494,154 @@ class PlanningService:
             if section.infrastructure_type == infrastructure_type:
                 return section
         raise ValueError(f"Unsupported infrastructure_type '{infrastructure_type.value}'.")
+
+    def _validate_geometry_points(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        geometry_points: list[GeometryPoint],
+    ) -> tuple[BuildSectionDefinition, list[GeometryPoint]]:
+        section = self._get_build_section(infrastructure_type)
+        map_tool = section.map_tool
+        if map_tool is None:
+            raise ValueError(f"Infrastructure type '{infrastructure_type.value}' does not support map geometry.")
+        if len(geometry_points) < map_tool.min_points or len(geometry_points) > map_tool.max_points:
+            raise ValueError(
+                f"Infrastructure type '{infrastructure_type.value}' expects between "
+                f"{map_tool.min_points} and {map_tool.max_points} geometry points."
+            )
+        return section, geometry_points
+
+    def _haversine_distance_m(self, first: GeometryPoint, second: GeometryPoint) -> float:
+        earth_radius_m = 6371000.0
+        lat1 = math.radians(first.latitude)
+        lat2 = math.radians(second.latitude)
+        delta_lat = lat2 - lat1
+        delta_lng = math.radians(second.longitude - first.longitude)
+
+        haversine = (
+            math.sin(delta_lat / 2) ** 2
+            + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lng / 2) ** 2
+        )
+        return 2 * earth_radius_m * math.asin(math.sqrt(haversine))
+
+    def _to_local_xy(self, points: list[GeometryPoint]) -> list[tuple[float, float]]:
+        reference_latitude = math.radians(sum(point.latitude for point in points) / len(points))
+        meters_per_degree_lat = 111320.0
+        meters_per_degree_lng = 111320.0 * math.cos(reference_latitude)
+        origin = points[0]
+
+        return [
+            (
+                (point.longitude - origin.longitude) * meters_per_degree_lng,
+                (point.latitude - origin.latitude) * meters_per_degree_lat,
+            )
+            for point in points
+        ]
+
+    def _polygon_area_sq_m(self, points: list[GeometryPoint]) -> float:
+        local_points = self._to_local_xy(points)
+        area = 0.0
+        for index, (x1, y1) in enumerate(local_points):
+            x2, y2 = local_points[(index + 1) % len(local_points)]
+            area += (x1 * y2) - (x2 * y1)
+        return abs(area) / 2.0
+
+    def _line_center_point(self, points: list[GeometryPoint]) -> GeometryPoint:
+        start, end = points[0], points[-1]
+        return GeometryPoint(
+            latitude=round((start.latitude + end.latitude) / 2.0, 7),
+            longitude=round((start.longitude + end.longitude) / 2.0, 7),
+        )
+
+    def _polygon_center_point(self, points: list[GeometryPoint]) -> GeometryPoint:
+        return GeometryPoint(
+            latitude=round(sum(point.latitude for point in points) / len(points), 7),
+            longitude=round(sum(point.longitude for point in points) / len(points), 7),
+        )
+
+    def _build_geometry_summary(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        geometry_points: list[GeometryPoint],
+    ) -> GeometryLocationSummaryResponse:
+        section, normalized_points = self._validate_geometry_points(infrastructure_type, geometry_points)
+        map_tool = section.map_tool
+        assert map_tool is not None
+
+        if map_tool.selection_mode == GeometrySelectionMode.LINE:
+            length_m = round(self._haversine_distance_m(normalized_points[0], normalized_points[-1]), 2)
+            return GeometryLocationSummaryResponse(
+                selection_mode=map_tool.selection_mode.value,
+                point_count=len(normalized_points),
+                start_point=normalized_points[0],
+                end_point=normalized_points[-1],
+                center_point=self._line_center_point(normalized_points),
+                length_m=length_m,
+                area_sq_m=None,
+            )
+
+        area_sq_m = round(self._polygon_area_sq_m(normalized_points), 2)
+        return GeometryLocationSummaryResponse(
+            selection_mode=map_tool.selection_mode.value,
+            point_count=len(normalized_points),
+            start_point=normalized_points[0],
+            end_point=normalized_points[-1],
+            center_point=self._polygon_center_point(normalized_points),
+            length_m=None,
+            area_sq_m=area_sq_m,
+        )
+
+    def _merge_geometry_into_details(
+        self,
+        infrastructure_type: InfrastructureCategory,
+        infrastructure_details: dict[str, Any],
+        geometry_summary: GeometryLocationSummaryResponse | None,
+    ) -> dict[str, Any]:
+        if geometry_summary is None:
+            return dict(infrastructure_details)
+
+        merged_details = dict(infrastructure_details)
+        if infrastructure_type == InfrastructureCategory.ROAD and geometry_summary.length_m is not None:
+            merged_details.setdefault("length_km", round(geometry_summary.length_m / 1000.0, 3))
+        elif infrastructure_type == InfrastructureCategory.BRIDGE and geometry_summary.length_m is not None:
+            merged_details.setdefault("span_length_m", geometry_summary.length_m)
+        elif infrastructure_type == InfrastructureCategory.AIRPORT and geometry_summary.length_m is not None:
+            merged_details.setdefault("runway_length_m", geometry_summary.length_m)
+        elif infrastructure_type == InfrastructureCategory.BUILDINGS and geometry_summary.area_sq_m is not None:
+            merged_details.setdefault("site_area_sq_m", geometry_summary.area_sq_m)
+        elif infrastructure_type == InfrastructureCategory.GENERAL_AREA and geometry_summary.area_sq_m is not None:
+            merged_details.setdefault("site_area_sq_m", geometry_summary.area_sq_m)
+        elif infrastructure_type == InfrastructureCategory.SOLAR_PANEL and geometry_summary.area_sq_m is not None:
+            merged_details.setdefault("panel_field_area_sq_m", geometry_summary.area_sq_m)
+
+        return merged_details
+
+    def resolve_geometry(
+        self,
+        site_id: str,
+        area_id: str,
+        infrastructure_type: InfrastructureCategory,
+        geometry_points: list[GeometryPoint],
+        infrastructure_details: dict[str, Any] | None = None,
+    ) -> GeometryResolutionResponse:
+        self._validate_site(site_id)
+        self._get_area(area_id)
+        geometry_summary = self._build_geometry_summary(infrastructure_type, geometry_points)
+        merged_details = self._merge_geometry_into_details(
+            infrastructure_type=infrastructure_type,
+            infrastructure_details=infrastructure_details or {},
+            geometry_summary=geometry_summary,
+        )
+        normalized_details = self._validate_infrastructure_details(infrastructure_type, merged_details)
+
+        return GeometryResolutionResponse(
+            site_id=site_id,
+            area_id=area_id,
+            infrastructure_type=infrastructure_type,
+            resolved_project_type=INFRASTRUCTURE_TO_PROJECT_TYPE[infrastructure_type],
+            geometry_summary=geometry_summary,
+            resolved_infrastructure_details=normalized_details,
+        )
 
     def _coerce_numeric_value(self, value: Any, field_name: str) -> float:
         if isinstance(value, bool):
@@ -717,6 +913,7 @@ class PlanningService:
         area_id: str,
         project_type: PlannerProjectType | None,
         infrastructure_type: InfrastructureCategory | None,
+        geometry_points: list[GeometryPoint] | None,
         infrastructure_details: dict[str, Any] | None,
         footprint_acres: float | None,
         estimated_daily_vehicle_trips: int | None,
@@ -728,14 +925,28 @@ class PlanningService:
         area = self._get_area(area_id)
 
         normalized_infrastructure_details: dict[str, str | int | float | bool] = {}
+        geometry_summary: GeometryLocationSummaryResponse | None = None
         if infrastructure_type is not None:
+            if geometry_points:
+                geometry_resolution = self.resolve_geometry(
+                    site_id=site_id,
+                    area_id=area_id,
+                    infrastructure_type=infrastructure_type,
+                    geometry_points=geometry_points,
+                    infrastructure_details=infrastructure_details or {},
+                )
+                geometry_summary = geometry_resolution.geometry_summary
+                merged_infrastructure_details: dict[str, Any] = dict(geometry_resolution.resolved_infrastructure_details)
+            else:
+                merged_infrastructure_details = dict(infrastructure_details or {})
+
             (
                 resolved_project_type,
                 normalized_infrastructure_details,
                 resolved_footprint_acres,
                 resolved_estimated_daily_vehicle_trips,
                 resolved_buildout_years,
-            ) = self._resolve_infrastructure_inputs(infrastructure_type, infrastructure_details or {})
+            ) = self._resolve_infrastructure_inputs(infrastructure_type, merged_infrastructure_details)
         else:
             if project_type is None or footprint_acres is None or estimated_daily_vehicle_trips is None or buildout_years is None:
                 raise ValueError(
@@ -808,6 +1019,7 @@ class PlanningService:
             area_id=area_id,
             project_type=resolved_project_type,
             infrastructure_type=infrastructure_type,
+            geometry_summary=geometry_summary,
             infrastructure_details=normalized_infrastructure_details,
             footprint_acres=round(resolved_footprint_acres, 2),
             estimated_daily_vehicle_trips=resolved_estimated_daily_vehicle_trips,
@@ -825,6 +1037,7 @@ class PlanningService:
                 traffic_bucket=traffic_bucket,
                 resolved_project_type=resolved_project_type,
                 infrastructure_type=infrastructure_type,
+                geometry_summary=geometry_summary,
                 infrastructure_details=normalized_infrastructure_details,
                 submitted_actions=[
                     PlannerSimulationActionResponse.model_validate(action) for action in submitted_action_inputs

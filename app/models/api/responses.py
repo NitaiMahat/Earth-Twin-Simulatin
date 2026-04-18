@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.models.domain.action import AudienceType, SimulationMode
 from app.models.domain.planning import (
     BuildSectionDefinition,
+    GeometryPoint,
     InfrastructureCategory,
     MitigationCommitment,
     PlanVerdict,
@@ -172,6 +173,25 @@ class PlanningBuildOptionsResponse(BaseModel):
     sections: list[BuildSectionDefinition]
 
 
+class GeometryLocationSummaryResponse(BaseModel):
+    selection_mode: str
+    point_count: int
+    start_point: GeometryPoint | None
+    end_point: GeometryPoint | None
+    center_point: GeometryPoint
+    length_m: float | None
+    area_sq_m: float | None
+
+
+class GeometryResolutionResponse(BaseModel):
+    site_id: str
+    area_id: str
+    infrastructure_type: InfrastructureCategory
+    resolved_project_type: PlannerProjectType
+    geometry_summary: GeometryLocationSummaryResponse
+    resolved_infrastructure_details: dict[str, str | int | float | bool]
+
+
 class PlannerSimulationActionResponse(BaseModel):
     zone_id: str
     requested_action_type: str
@@ -187,6 +207,7 @@ class PlannerSimulationInputsResponse(BaseModel):
     traffic_bucket: str
     resolved_project_type: PlannerProjectType
     infrastructure_type: InfrastructureCategory | None
+    geometry_summary: GeometryLocationSummaryResponse | None
     infrastructure_details: dict[str, str | int | float | bool]
     submitted_actions: list[PlannerSimulationActionResponse]
     mitigated_actions: list[PlannerSimulationActionResponse]
@@ -207,6 +228,7 @@ class ProposalAssessmentResponse(BaseModel):
     area_id: str
     project_type: PlannerProjectType
     infrastructure_type: InfrastructureCategory | None
+    geometry_summary: GeometryLocationSummaryResponse | None
     infrastructure_details: dict[str, str | int | float | bool]
     footprint_acres: float
     estimated_daily_vehicle_trips: int

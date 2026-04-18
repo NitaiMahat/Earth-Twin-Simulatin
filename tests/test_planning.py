@@ -42,6 +42,62 @@ def test_get_build_options_returns_section_specific_fields() -> None:
     assert "runway_width_m" in field_names
     assert "terminal_area_sq_m" in field_names
     assert "apron_area_sq_m" in field_names
+    assert airport_section["map_tool"]["selection_mode"] == "line"
+    assert airport_section["map_tool"]["min_points"] == 2
+
+
+def test_resolve_geometry_returns_line_metrics_for_road() -> None:
+    response = client.post(
+        "/api/v1/planning/geometry/resolve",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "arterial_infill_corridor",
+            "infrastructure_type": "road",
+            "geometry_points": [
+                {"latitude": 41.6401, "longitude": -87.5601},
+                {"latitude": 41.6501, "longitude": -87.5401}
+            ],
+            "infrastructure_details": {
+                "lane_count": 4,
+                "daily_vehicle_trips": 1800,
+                "construction_years": 3
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resolved_project_type"] == "roadway_logistics_expansion"
+    assert payload["geometry_summary"]["selection_mode"] == "line"
+    assert payload["geometry_summary"]["length_m"] > 0
+    assert payload["resolved_infrastructure_details"]["length_km"] > 0
+
+
+def test_resolve_geometry_returns_polygon_metrics_for_solar_panel() -> None:
+    response = client.post(
+        "/api/v1/planning/geometry/resolve",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "river_buffer_redevelopment",
+            "infrastructure_type": "solar_panel",
+            "geometry_points": [
+                {"latitude": 41.6200, "longitude": -87.5500},
+                {"latitude": 41.6200, "longitude": -87.5485},
+                {"latitude": 41.6185, "longitude": -87.5485},
+                {"latitude": 41.6185, "longitude": -87.5500}
+            ],
+            "infrastructure_details": {
+                "capacity_mw": 5.5,
+                "maintenance_vehicle_trips_per_day": 12
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["geometry_summary"]["selection_mode"] == "polygon"
+    assert payload["geometry_summary"]["area_sq_m"] > 0
+    assert payload["resolved_infrastructure_details"]["panel_field_area_sq_m"] > 0
 
 
 def test_assess_proposal_returns_scorecards_and_simulation_inputs() -> None:
@@ -103,6 +159,36 @@ def test_assess_proposal_accepts_infrastructure_specific_airport_details() -> No
     assert payload["footprint_acres"] > 0
     assert payload["simulation_inputs"]["resolved_project_type"] == "industrial_facility"
     assert payload["simulation_inputs"]["infrastructure_details"]["runway_length_m"] == 2400
+
+
+def test_assess_proposal_accepts_geometry_points_for_airport_runway() -> None:
+    client.post("/api/v1/world/reset")
+    response = client.post(
+        "/api/v1/planning/proposals/assess",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "calumet_industrial_strip",
+            "infrastructure_type": "airport",
+            "geometry_points": [
+                {"latitude": 41.6400, "longitude": -87.5700},
+                {"latitude": 41.6540, "longitude": -87.5450}
+            ],
+            "infrastructure_details": {
+                "runway_width_m": 45,
+                "terminal_area_sq_m": 18000,
+                "apron_area_sq_m": 42000,
+                "daily_vehicle_trips": 3200,
+                "construction_years": 5
+            },
+            "mitigation_commitment": "medium"
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["geometry_summary"]["length_m"] > 0
+    assert payload["infrastructure_details"]["runway_length_m"] > 0
+    assert payload["simulation_inputs"]["geometry_summary"]["selection_mode"] == "line"
 
 
 def test_assess_proposal_rejects_unknown_site_and_disallowed_project_type() -> None:
@@ -173,6 +259,29 @@ def test_assess_proposal_rejects_missing_required_infrastructure_fields() -> Non
     assert response.status_code == 422
 
 
+def test_assess_proposal_rejects_invalid_geometry_point_count() -> None:
+    client.post("/api/v1/world/reset")
+    response = client.post(
+        "/api/v1/planning/proposals/assess",
+        json={
+            "site_id": "illinois_calumet_corridor_demo",
+            "area_id": "river_buffer_redevelopment",
+            "infrastructure_type": "solar_panel",
+            "geometry_points": [
+                {"latitude": 41.6200, "longitude": -87.5500},
+                {"latitude": 41.6200, "longitude": -87.5485}
+            ],
+            "infrastructure_details": {
+                "capacity_mw": 5.5,
+                "maintenance_vehicle_trips_per_day": 12
+            },
+            "mitigation_commitment": "medium"
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_planning_service_maps_project_type_and_mitigation_commitment_deterministically() -> None:
     client.post("/api/v1/world/reset")
     low_commitment = planning_service.assess_proposal(
@@ -180,6 +289,7 @@ def test_planning_service_maps_project_type_and_mitigation_commitment_determinis
         area_id="arterial_infill_corridor",
         project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
         infrastructure_type=None,
+        geometry_points=[],
         infrastructure_details={},
         footprint_acres=12,
         estimated_daily_vehicle_trips=1500,
@@ -191,6 +301,7 @@ def test_planning_service_maps_project_type_and_mitigation_commitment_determinis
         area_id="arterial_infill_corridor",
         project_type=PlannerProjectType.ROADWAY_LOGISTICS_EXPANSION,
         infrastructure_type=None,
+        geometry_points=[],
         infrastructure_details={},
         footprint_acres=12,
         estimated_daily_vehicle_trips=1500,
