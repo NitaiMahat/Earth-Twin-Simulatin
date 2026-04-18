@@ -328,3 +328,19 @@ class BuilderProjectHistoryResponse(BaseModel):
     project_name: str
     entries: list[BuilderProjectHistoryEntryResponse]
     count: int
+
+
+class GoalActionItem(BaseModel):
+    action_type: str
+    intensity: float
+    duration_years: int
+
+
+class GoalToActionsResponse(BaseModel):
+    goal: str
+    zone_id: str
+    actions: list[GoalActionItem]
+
+
+class SuggestImprovementsResponse(BaseModel):
+    analysis: str

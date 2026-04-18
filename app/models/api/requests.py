@@ -114,3 +114,34 @@ class BuilderProjectSimulateRequest(BaseModel):
     project_name: str | None = Field(default=None, min_length=1, max_length=120)
     mitigation_commitment: MitigationCommitment | None = None
     planner_notes: str | None = None
+
+
+class GoalToActionsRequest(BaseModel):
+    goal: str = Field(min_length=5, max_length=500)
+    zone_id: str
+    base_world_id: str = "illinois_calumet_corridor_demo"
+
+
+class SuggestImprovementsRequest(BaseModel):
+    goal: str
+    zone_id: str
+    zone_name: str
+    actions: list[dict]
+    initial_metrics: dict
+    final_metrics: dict
+    projection_years: int = Field(ge=1, le=50)
+    sustainability_score: float
+    overall_outlook: str
+
+
+class GenerateReportRequest(BaseModel):
+    goal: str
+    zone_name: str
+    zone_type: str = "unknown"
+    actions: list[dict]
+    initial_metrics: dict
+    final_metrics: dict
+    projection_years: int = Field(ge=1, le=50)
+    sustainability_score: float
+    overall_outlook: str
+    ai_analysis: str = ""
