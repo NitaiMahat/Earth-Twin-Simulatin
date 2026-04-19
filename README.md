@@ -1,430 +1,570 @@
 # Earth Twin Backend
 
-Earth Twin Backend is a FastAPI service for global infrastructure planning and environmental simulation.
+FastAPI backend for global infrastructure planning and environmental impact simulation. Users describe infrastructure projects in natural language or via a map-driven form, and the backend runs a full environmental assessment against a live continent-scale world baseline.
 
-The backend no longer boots from a fixed Illinois demo world. It now builds a dynamic global baseline around the 7 continents and supports a location-first planner flow:
-- the world view is continent-based
-- planning starts from latitude/longitude, not a predefined demo parcel
-- current baseline conditions are pulled from public data providers where possible
-- simulations run from that current baseline instead of from hardcoded demo zones
-- authenticated users can save planning snapshots in `My Projects`
+**Production URL:** `https://earth-twin-simulatin.onrender.com`
+**Docs (local):** `http://127.0.0.1:8000/docs`
 
-Important: this is now more realistic than the original demo, but it is still a planning simulator, not a scientific digital twin of Earth.
+---
 
-## What Is Real Now
+## What It Does
 
-The backend currently uses public data to build live or latest-available baseline conditions:
-- Open-Meteo weather for current temperature
-- Open-Meteo air-quality for current AQI
-- World Bank public indicators where available for land-cover and density context
-- Nominatim reverse geocoding for country and state enrichment
-- optional Postgres-backed provider cache for persistent snapshot reuse across restarts
+1. **Builds a live global world** from 7 continent zones seeded with real public data (weather, air quality, land cover, population density).
+2. **Accepts infrastructure proposals** via natural language chat or a structured form with map geometry.
+3. **Runs an environmental simulation** — submitted plan vs. mitigated plan — and returns scorecards, risk level, sustainability score, and a verdict.
+4. **Generates AI-written PDF reports** via Gemini, uploaded to Supabase Storage.
+5. **Saves authenticated users' projects** to a Postgres-backed snapshot store.
 
-The world is generated as 7 continent records:
-- `continent_africa`
-- `continent_antarctica`
-- `continent_asia`
-- `continent_europe`
-- `continent_north_america`
-- `continent_oceania`
-- `continent_south_america`
+---
 
-Each continent is returned through the existing world and zone APIs, but the records now represent continent-scale regions instead of demo parcels.
+## What Is Real
 
-## What Is Still Modeled
+The backend pulls live or latest-available public data to seed baseline conditions:
 
-Not every environmental signal can be truly real-time.
+| Source | What it provides |
+|---|---|
+| Open-Meteo Weather API | Current surface temperature |
+| Open-Meteo Air Quality API | Current AQI (US standard) |
+| World Bank Indicators API | Forest area %, population density by country |
+| Nominatim (OpenStreetMap) | Reverse geocoding — country, state, city label |
+| Nominatim (OpenStreetMap) | Forward geocoding — text address → lat/lon |
 
-These parts are still modeled or inferred:
-- sustainability score weighting
-- long-term scenario deltas after a build proposal
-- project impact rules like roadway, industrial, restoration, and tree-loss effects
-- biodiversity and ecosystem-health synthesis from the observed baseline metrics
+Provider responses are cached in memory (TTL: 1 hour by default) and optionally persisted to Postgres across restarts. If a provider is unavailable, the backend falls back to modeled baseline values so the API remains usable.
 
-So the product should now be described like this:
-- baseline conditions are source-backed
-- future project impact is modeled
-- recommendations are scenario estimates, not guarantees
+---
 
-## Core Product Flows
+## What Is Modeled
 
-### 1. Global World Baseline
+These parts are not real-time — they are simulation rules or weighted derivations:
 
-`GET /api/v1/world`
+- Sustainability score (weighted formula across 6 environmental metrics)
+- Project impact rules (traffic, pollution, tree cover, biodiversity, ecosystem health deltas)
+- Long-term scenario projections
+- Biodiversity and ecosystem health synthesis from observed baseline metrics
 
-Returns the dynamic global baseline world with 7 continent entries.
+The product is a **planning simulator with source-backed baselines**, not a scientific digital twin.
 
-`POST /api/v1/world/reset`
+---
 
-Refreshes the world from the current public baseline sources.
+## Zone IDs
 
-### 2. Continent Views
+The world is always seeded with these 7 continent zones:
 
-`GET /api/v1/zones`
+| Zone ID | Name |
+|---|---|
+| `continent_africa` | Africa |
+| `continent_antarctica` | Antarctica |
+| `continent_asia` | Asia |
+| `continent_europe` | Europe |
+| `continent_north_america` | North America |
+| `continent_oceania` | Oceania |
+| `continent_south_america` | South America |
 
-Returns the 7 continent records.
+---
 
-`GET /api/v1/zones/{zone_id}`
+## Supported Infrastructure Types
 
-Returns a continent detail view with:
-- risk summary
-- top drivers
-- recommended focus
+The following types are accepted across all planning and text endpoints:
 
-### 3. Global Planning Metadata
+| Value | Description |
+|---|---|
+| `road` | Road segment, corridor, or logistics access road |
+| `highway` | Motorway, freeway, or high-capacity inter-city corridor |
+| `bridge` | Bridge, flyover, crossing, or elevated connector |
+| `building` / `buildings` | Single building or building cluster — residential, commercial, civic |
+| `airport` | Airport, runway upgrade, freight apron, or terminal expansion |
+| `solar_farm` / `solar_panel` | Ground-mounted solar field, utility-scale PV, or solar-plus-storage |
+| `dam` | Dam, weir, reservoir, or hydro-electric infrastructure |
+| `industrial` | Factory, warehouse, logistics hub, or industrial zone |
+| `general_area` | Broad land conversion or district-scale redevelopment (form-only, not text) |
 
-`GET /api/v1/planning/site`
+---
 
-Returns planner metadata for the global location-first flow:
-- `site_id` = `global_location_planner`
-- continent list
-- current continent risk levels
-- supported infrastructure sections
+## API Reference
 
-`GET /api/v1/planning/build-options`
+### Health
 
-Returns the infrastructure form schema for:
-- road
-- bridge
-- buildings
-- airport
-- general_area
-- solar_panel
+```
+GET /api/v1/health
+```
 
-### 4. Geometry Resolution
+### World
 
-`POST /api/v1/planning/geometry/resolve`
+```
+GET  /api/v1/world          → returns global world with 7 continent zones
+POST /api/v1/world/reset    → refreshes world from current public baseline
+```
 
-Frontend sends:
-- `location`
-- `infrastructure_type`
-- `geometry_points`
-- `infrastructure_details`
+### Zones
 
-Backend returns:
-- resolved location context
-- resolved continent context
-- reverse-geocoded country and state when available
-- geometry summary
-- derived infrastructure values
+```
+GET /api/v1/zones              → list all 7 continent zones
+GET /api/v1/zones/{zone_id}    → zone detail with risk summary and top drivers
+```
 
-### 5. Proposal Assessment
+### Planning Metadata
 
-`POST /api/v1/planning/proposals/assess`
+```
+GET /api/v1/planning/site           → planner site metadata, continent list, risk levels
+GET /api/v1/planning/build-options  → full form schema for all supported infrastructure types
+```
 
-Frontend sends:
-- `location`
-- infrastructure details or project type details
-- mitigation commitment
+### Geometry Resolution
 
-Backend:
-1. resolves the continent from the submitted coordinates
-2. reverse-geocodes the point for country and state context when available
-3. builds a live/current location baseline
-4. reuses cached provider snapshots when possible
-5. inserts that baseline into the global world copy
-6. runs submitted and mitigated scenarios
-7. returns scorecards and recommendation
+```
+POST /api/v1/planning/geometry/resolve
+```
 
-### 6. Text-To-Plan Draft And Run
+Send `location`, `infrastructure_type`, `geometry_points`, and `infrastructure_details`.
+Returns resolved continent, reverse-geocoded country/state, geometry summary, and auto-derived values (road length, runway length, site area, etc.).
 
-`POST /api/v1/planning/text/draft`
+### Proposal Assessment
 
-Frontend sends:
-- `location`
-- mapped `geometry_points`
-- `user_prompt`
+```
+POST /api/v1/planning/proposals/assess
+```
 
-Backend:
-1. retrieves the relevant internal planner schema for airport vs road
-2. asks Gemini to extract the likely planning fields
-3. merges geometry-derived values from the mapped line
-4. returns a reviewable draft with missing fields, assumptions, confidence, and readiness
+Runs the full simulation pipeline. Returns submitted plan scorecard, mitigated plan scorecard, recommended option, and comparison summary.
 
-`POST /api/v1/planning/text/run`
-
-Frontend sends the same input plus:
-- `mitigation_commitment`
-- optional `confirmed_overrides`
-
-Backend:
-1. repeats the grounded extraction flow
-2. applies user-confirmed overrides
-3. validates required fields
-4. runs the existing proposal assessment pipeline
-5. returns both the extraction summary and the final simulation result
-
-## Current Planner Contract
-
-Location is now explicit.
-
-Example `location` object:
-
+**Request:**
 ```json
 {
-  "latitude": 41.8781,
-  "longitude": -87.6298,
-  "label": "Chicago Test Location",
-  "country_code": "USA"
+  "location": { "latitude": 35.6762, "longitude": 139.6503, "label": "Tokyo" },
+  "infrastructure_type": "road",
+  "geometry_points": [
+    { "latitude": 35.670, "longitude": 139.640 },
+    { "latitude": 35.680, "longitude": 139.660 }
+  ],
+  "infrastructure_details": { "lane_count": 4, "daily_vehicle_trips": 8000 },
+  "mitigation_commitment": "medium"
 }
 ```
 
-Example geometry resolve request:
-
+**Response includes:**
 ```json
 {
-  "location": {
-    "latitude": 41.8781,
-    "longitude": -87.6298,
-    "label": "Chicago Test Location",
-    "country_code": "USA"
+  "submitted_plan": {
+    "plan_score": 42.0,
+    "sustainability_score": 42.0,
+    "verdict": "conditional",
+    "overall_outlook": "WORSENING",
+    "top_risks": ["..."],
+    "required_mitigations": ["..."],
+    "summary_text": "..."
   },
-  "infrastructure_type": "road",
-  "geometry_points": [
-    { "latitude": 41.6401, "longitude": -87.5601 },
-    { "latitude": 41.6501, "longitude": -87.5401 }
+  "mitigated_plan": { "sustainability_score": 61.0, ... },
+  "recommended_option": "conditional",
+  "comparison_summary": "..."
+}
+```
+
+> Note: `sustainability_score` and `plan_score` are the same value. Both fields are present for compatibility.
+
+---
+
+### AI Plan Builder — Text-To-Plan (RAG + Gemini)
+
+The AI Plan Builder lets a user type a natural language prompt. No map interaction required.
+
+#### How It Works
+
+```
+User types: "build a 4-lane highway from Shibuya to Narita Airport, Tokyo"
+    ↓
+RAG checks: is the infrastructure type supported?
+    ↓
+Gemini extracts:
+  - infrastructure_type: "highway"
+  - infrastructure_details: { lane_count: 4, ... }
+  - location_mentions: ["Shibuya, Tokyo", "Narita Airport, Tokyo"]
+  - location_query: "Tokyo, Japan"
+    ↓
+Nominatim geocodes each location_mention → lat/lon points
+Nominatim geocodes location_query → resolves to continent_asia
+    ↓
+Returns suggested_geometry_points for auto-drawing on Cesium map
+Returns resolved_zone_id for auto-selecting the simulation zone
+```
+
+#### Draft
+
+```
+POST /api/v1/planning/text/draft
+```
+
+**Request:**
+```json
+{
+  "prompt": "build a 4-lane highway from Shibuya to Narita Airport",
+  "geometry_points": []
+}
+```
+
+- `prompt` — required (5–4000 chars)
+- `geometry_points` — optional, send `[]` if user hasn't drawn on the map
+- `location` — optional `{ latitude, longitude, label }`, omit to extract from text
+
+**Response:**
+```json
+{
+  "infrastructure_type": "highway",
+  "project_type": "roadway_logistics_expansion",
+  "planner_summary": "4-lane highway from Shibuya to Narita Airport",
+  "confidence": 0.91,
+  "simulation_ready": false,
+  "missing_fields": ["daily_vehicle_trips"],
+  "assumptions": ["Assumed urban zone based on Tokyo mention"],
+  "infrastructure_details": { "lane_count": 4 },
+  "resolved_zone_id": "continent_asia",
+  "resolved_location_label": "Shibuya",
+  "suggested_geometry_points": [
+    { "latitude": 35.6580, "longitude": 139.7016, "label": "Shibuya" },
+    { "latitude": 35.7720, "longitude": 140.3929, "label": "Narita Airport" }
   ],
-  "infrastructure_details": {
-    "lane_count": 4,
-    "daily_vehicle_trips": 1800,
-    "construction_years": 3
+  "location_context": {
+    "label": "Shibuya",
+    "latitude": 35.6580,
+    "longitude": 139.7016,
+    "continent_id": "asia",
+    "baseline_zone_id": "continent_asia",
+    "country_name": "Japan"
   }
 }
 ```
 
-Example proposal assessment request:
+**Key response fields:**
 
+| Field | Purpose |
+|---|---|
+| `resolved_zone_id` | Auto-select this zone on the globe |
+| `resolved_location_label` | Human-readable location name to display |
+| `suggested_geometry_points` | Auto-draw these points on the Cesium map |
+| `simulation_ready` | If `true`, go straight to `/text/run` |
+| `missing_fields` | Show these as required form inputs |
+| `confidence` | Below 0.65 → show warning, ask user to confirm type |
+
+**Error — unsupported type:**
+```json
+{ "detail": "That infrastructure type is not supported. Supported types: road, highway, bridge, building, airport, solar farm, dam, industrial." }
+```
+
+#### Run
+
+```
+POST /api/v1/planning/text/run
+```
+
+**Request:**
 ```json
 {
-  "location": {
-    "latitude": 41.8781,
-    "longitude": -87.6298,
-    "label": "Chicago Freight Corridor",
-    "country_code": "USA"
-  },
-  "infrastructure_type": "airport",
+  "prompt": "build a 4-lane highway from Shibuya to Narita Airport",
   "geometry_points": [
-    { "latitude": 41.6400, "longitude": -87.5700 },
-    { "latitude": 41.6540, "longitude": -87.5450 }
+    { "latitude": 35.6580, "longitude": 139.7016 },
+    { "latitude": 35.7720, "longitude": 140.3929 }
   ],
-  "infrastructure_details": {
-    "runway_width_m": 45,
-    "terminal_area_sq_m": 18000,
-    "apron_area_sq_m": 42000,
-    "daily_vehicle_trips": 3200,
-    "construction_years": 5
-  },
   "mitigation_commitment": "medium",
-  "planner_notes": "Regional cargo airport expansion."
+  "confirmed_overrides": {
+    "infrastructure_type": "highway",
+    "infrastructure_details": { "lane_count": 4, "daily_vehicle_trips": 12000 }
+  }
 }
 ```
 
-## Frontend Responsibilities
+- Use `suggested_geometry_points` from the draft response if user hasn't drawn manually
+- `mitigation_commitment` — `"low"` | `"medium"` | `"high"`, required
+- `confirmed_overrides` — use to fill in `missing_fields` from draft
 
-Frontend should handle:
-- map rendering
-- point selection
-- polygon/line drawing
-- location picker UX
-- account/session UX if added later
-- rendering scorecards, charts, and reports
+**Response:**
+```json
+{
+  "extraction": { "...same shape as draft response..." },
+  "assessment": {
+    "submitted_plan": { "sustainability_score": 38.0, "verdict": "not_recommended", ... },
+    "mitigated_plan": { "sustainability_score": 57.0, "verdict": "conditional", ... },
+    "recommended_option": "conditional",
+    "comparison_summary": "..."
+  }
+}
+```
 
-Frontend should not hardcode:
-- geometry math
-- continent resolution
-- infrastructure field rules
-- scorecard generation
-- mitigation comparison logic
+**Decision flow:**
+```
+POST /text/draft
+    ↓
+resolved_zone_id → auto-select zone on globe
+suggested_geometry_points → auto-draw on Cesium map
+    ↓
+simulation_ready = true?  →  POST /text/run immediately
+simulation_ready = false? →  show missing_fields form, wait for input
+confidence < 0.65?        →  show warning, confirm infrastructure_type
+    ↓
+POST /text/run → show assessment scorecard
+```
 
-## Backend Responsibilities
+---
 
-Backend now owns:
-- continent world generation
-- location-to-continent resolution
-- reverse geocoding and country normalization
-- public baseline ingestion
-- cached provider snapshots, with optional Postgres persistence
-- geometry resolution
-- infrastructure normalization
-- project simulation
-- sustainability/risk scoring
-- comparison between submitted and mitigated plans
-- Supabase token verification for protected routes
-- user-owned project snapshot persistence and report metadata
+### Raw Simulation
 
-## Auth And My Projects
+```
+POST /api/v1/simulation/apply    → apply one action to a zone, returns before/after deltas
+POST /api/v1/simulation/project  → project multiple actions over N years (max 50)
+POST /api/v1/simulation/compare  → compare named scenarios side by side
+POST /api/v1/simulation/report   → generate Gemini-written analysis + stream as PDF
+```
 
-Supabase should handle sign-in on the frontend. The frontend then sends the Supabase access token to the backend as:
+### Scenario Templates
+
+```
+GET  /api/v1/scenarios/templates                    → list available scenario templates
+GET  /api/v1/scenarios/templates/{template_id}      → template detail
+POST /api/v1/scenarios/templates/{template_id}/run  → run a template scenario
+```
+
+### AI Endpoints
+
+All 3 endpoints accept an optional `location_label` field. When provided, AI responses use the specific city or address ("Tokyo, Japan") instead of the continent name ("Asia").
+
+```
+POST /api/v1/ai/explain
+```
+```json
+{
+  "zone_id": "continent_asia",
+  "question": "Why is biodiversity declining here?",
+  "mode": "planning",
+  "location_label": "Tokyo, Japan"
+}
+```
+
+```
+POST /api/v1/ai/goal-to-actions
+```
+```json
+{
+  "goal": "Reduce pollution by 30% in 5 years",
+  "zone_id": "continent_asia",
+  "location_label": "Tokyo, Japan"
+}
+```
+
+```
+POST /api/v1/ai/suggest-improvements
+```
+```json
+{
+  "goal": "Reduce pollution",
+  "zone_id": "continent_asia",
+  "zone_name": "Asia",
+  "location_label": "Tokyo, Japan",
+  "actions": [...],
+  "initial_metrics": {...},
+  "final_metrics": {...},
+  "projection_years": 10,
+  "sustainability_score": 58.0,
+  "overall_outlook": "IMPROVING"
+}
+```
+
+---
+
+## Auth and My Projects
+
+Supabase handles authentication on the frontend. The frontend sends the Supabase access token to the backend on protected routes:
 
 ```http
 Authorization: Bearer <supabase_access_token>
 ```
 
-Protected backend routes:
-- `GET /api/v1/auth/me`
-- `GET /api/v1/my-projects`
-- `POST /api/v1/my-projects`
-- `GET /api/v1/my-projects/{project_id}`
-- `PATCH /api/v1/my-projects/{project_id}/report`
-- `POST /api/v1/my-projects/{project_id}/report/generate`
+The backend verifies the JWT against the Supabase JWKS endpoint (modern ES256/RS256 tokens) or via `SUPABASE_JWT_SECRET` (legacy HS256 projects only).
 
-`My Projects` stores:
-- the saved planning assessment snapshot
-- the recommendation and comparison output
-- optional text-planning extraction metadata from the prompt flow
-- later AI analysis text or PDF metadata
-
-It does not store the whole mutable simulation world state.
-
-## Recommended Frontend Flow
-
-1. Call `GET /api/v1/planning/site`
-2. Call `GET /api/v1/planning/build-options`
-3. Let user choose infrastructure type
-4. Let user pick a real location on the map
-5. Let user draw geometry
-6. Call `POST /api/v1/planning/geometry/resolve`
-7. Show derived values and resolved continent
-8. Call `POST /api/v1/planning/proposals/assess`
-9. Render:
-   - `location_context`
-   - `submitted_plan`
-   - `mitigated_plan`
-   - `recommended_option`
-   - `comparison_summary`
-10. If the user is signed in, call `POST /api/v1/my-projects`
-11. When a report is generated later, call `POST /api/v1/my-projects/{project_id}/report/generate`
-
-For text-driven planning:
-1. Let the user map the line first
-2. Collect a natural-language prompt like “I want to build an airport in this area”
-3. Call `POST /api/v1/planning/text/draft`
-4. Show the extracted fields, missing values, and confidence
-5. Let the user confirm any overrides
-6. Call `POST /api/v1/planning/text/run`
-7. Optionally save the finished result to `My Projects`
-
-## Other API Endpoints
-
-### Health
-- `GET /api/v1/health`
-
-### Raw Simulation
-- `POST /api/v1/simulation/apply`
-- `POST /api/v1/simulation/project`
-- `POST /api/v1/simulation/compare`
-
-### Scenario Templates
-- `GET /api/v1/scenarios/templates`
-- `GET /api/v1/scenarios/templates/{template_id}`
-- `POST /api/v1/scenarios/templates/{template_id}/run`
-
-### AI Explain
-- `POST /api/v1/ai/explain`
-- `POST /api/v1/ai/goal-to-actions`
-- `POST /api/v1/ai/suggest-improvements`
-
-### Report Generation
-- `POST /api/v1/simulation/report`
-
-### Text Planning
-- `POST /api/v1/planning/text/draft`
-- `POST /api/v1/planning/text/run`
-
-### Stored Project Reports
-- `POST /api/v1/my-projects/{project_id}/report/generate`
-
-## Deployment
-
-Recommended free host:
-- Render
-
-Required Render settings:
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Health Check Path: `/api/v1/health`
-
-Important environment variables:
-- `CORS_ORIGINS`
-- `GEMINI_API_KEY` if using Gemini endpoints
-
-Optional tuning:
-- `DATABASE_URL`
-- `POSTGRES_HOST`
-- `POSTGRES_PORT`
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `SUPABASE_JWT_SECRET` for legacy HS256 projects only
-- `SUPABASE_JWT_AUDIENCE`
-- `SUPABASE_JWT_ISSUER`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_STORAGE_BUCKET`
-- `SUPABASE_STORAGE_PUBLIC`
-- `SUPABASE_STORAGE_SIGNED_URL_TTL_SECONDS`
-- `PROVIDER_CACHE_TABLE_NAME`
-- `PUBLIC_DATA_TIMEOUT_SECONDS`
-- `PROVIDER_CACHE_TTL_SECONDS`
-- `PROVIDER_CACHE_CONNECT_TIMEOUT_SECONDS`
-- `OPEN_METEO_WEATHER_URL`
-- `OPEN_METEO_AIR_QUALITY_URL`
-- `NOMINATIM_REVERSE_URL`
-- `PUBLIC_DATA_USER_AGENT`
-
-## Persistent Provider Cache With Docker Postgres
-
-To keep provider snapshots warm across backend restarts, run the included Postgres service:
-
-```bash
-docker compose up -d postgres
+**Protected routes:**
+```
+GET    /api/v1/auth/me
+GET    /api/v1/my-projects
+POST   /api/v1/my-projects
+GET    /api/v1/my-projects/{project_id}
+PATCH  /api/v1/my-projects/{project_id}/report
+POST   /api/v1/my-projects/{project_id}/report/generate
 ```
 
-Then set either:
-- `DATABASE_URL=postgresql://earth_twin:earth_twin@localhost:5432/earth_twin`
+**What My Projects stores:**
+- Full planning assessment snapshot (JSONB)
+- Recommendation and comparison output
+- Optional text-planning extraction metadata (prompt, confidence, inferred type)
+- Optional AI analysis text and PDF metadata (storage path, signed URL)
 
-or the standard component vars:
-- `POSTGRES_HOST=localhost`
-- `POSTGRES_PORT=5432`
-- `POSTGRES_DB=earth_twin`
-- `POSTGRES_USER=earth_twin`
-- `POSTGRES_PASSWORD=earth_twin`
+**PDF report flow:**
+1. `POST /my-projects` → saves the project, returns `project_id`
+2. `POST /my-projects/{project_id}/report/generate` → backend generates PDF, uploads to Supabase Storage, saves metadata
+3. `GET /my-projects/{project_id}` → returns fresh signed URL for the PDF (valid 1 hour, auto-refreshed)
 
-The backend creates the provider-cache table automatically on first use. If Postgres is not configured or unavailable, the app falls back to the current in-memory cache so local development still works.
+---
 
-The same Postgres connection is also used for authenticated `My Projects` storage.
+## Recommended Frontend Flows
 
-If Supabase Storage is configured, the backend can also generate a project PDF, upload it to the configured bucket, and save the file metadata back onto the project record.
+### Form-Driven Flow
 
-For modern Supabase projects using rotating signing keys like `ECC (P-256)`, the backend verifies access tokens through the project JWKS endpoint derived from `SUPABASE_URL`. In that setup, `SUPABASE_JWT_SECRET` is not required.
+1. `GET /api/v1/planning/site` — load planner metadata
+2. `GET /api/v1/planning/build-options` — load form schema for selected infrastructure type
+3. User picks location on map + draws geometry
+4. `POST /api/v1/planning/geometry/resolve` — get derived values and resolved continent
+5. `POST /api/v1/planning/proposals/assess` — run simulation, display scorecards
+6. `POST /api/v1/my-projects` (authenticated) — save project
+7. `POST /api/v1/my-projects/{id}/report/generate` — generate and upload PDF report
+
+### AI Chat Flow (Text-To-Plan)
+
+1. User types a natural language prompt
+2. `POST /api/v1/planning/text/draft`
+   - Auto-select zone from `resolved_zone_id`
+   - Auto-draw map points from `suggested_geometry_points`
+   - Show missing fields if `simulation_ready: false`
+3. User fills any missing fields
+4. `POST /api/v1/planning/text/run` — run simulation, display scorecards
+5. Optionally save to My Projects
+
+### Goal-to-Simulation Flow
+
+1. User types a sustainability goal
+2. `POST /api/v1/ai/goal-to-actions` — Gemini returns 2–4 recommended actions
+3. `POST /api/v1/simulation/project` — project those actions over N years
+4. `POST /api/v1/simulation/report` — generate Gemini analysis PDF
+
+---
+
+## Frontend Responsibilities
+
+- Map rendering (Cesium)
+- Point/polygon/line drawing on the map
+- Location search UI (Nominatim geocoding called directly from browser — no backend proxy needed)
+- Auto-placing `suggested_geometry_points` on the map from text/draft response
+- Auto-selecting zone from `resolved_zone_id`
+- Rendering scorecards, charts, and reports
+- Supabase login/session management
+- Passing `Authorization: Bearer <token>` on protected routes
+- Passing `location_label` to AI endpoints for city-level context
+
+## Backend Responsibilities
+
+- Continent world generation and live baseline seeding
+- Location-to-continent resolution (coordinate-based bounding boxes + distance fallback)
+- Forward geocoding — text address/zip/landmark → lat/lon (Nominatim)
+- Reverse geocoding — lat/lon → country, state, city (Nominatim)
+- Public data ingestion (Open-Meteo, World Bank)
+- Provider cache with optional Postgres persistence
+- RAG-based infrastructure type detection and template retrieval
+- Gemini integration — location extraction, infrastructure field extraction, goal-to-actions, analysis reports
+- Geometry resolution and auto-derived field calculation
+- Infrastructure normalization and validation
+- Environmental simulation rules (traffic, pollution, tree cover, biodiversity, ecosystem health)
+- Sustainability and risk scoring
+- Submitted vs. mitigated plan comparison
+- Supabase JWT verification for protected routes
+- Project snapshot persistence and PDF upload to Supabase Storage
+
+---
+
+## Environment Variables
+
+**Required for core features:**
+
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Required for all AI features (text planning, reports, goal-to-actions) |
+| `DATABASE_URL` | Postgres connection string (Supabase direct connection, port 5432) |
+| `SUPABASE_URL` | Supabase project URL — used for JWT verification and storage |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — used for PDF upload to storage |
+| `CORS_ORIGINS` | Frontend URL(s), comma-separated. Example: `https://yourapp.vercel.app` |
+
+**Auth tuning (optional):**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SUPABASE_JWT_AUDIENCE` | `authenticated` | Expected JWT audience claim |
+| `SUPABASE_JWT_ISSUER` | derived from `SUPABASE_URL` | Expected JWT issuer |
+| `SUPABASE_JWT_SECRET` | — | Only needed for legacy HS256 projects |
+
+**Storage (optional):**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SUPABASE_STORAGE_BUCKET` | `project-reports` | Bucket name for PDF uploads |
+| `SUPABASE_STORAGE_PUBLIC` | `false` | Set `true` for public bucket, `false` for signed URLs |
+| `SUPABASE_STORAGE_SIGNED_URL_TTL_SECONDS` | `3600` | Signed URL expiry |
+
+**Provider / cache tuning (optional):**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PROVIDER_CACHE_TTL_SECONDS` | `3600` | In-memory cache TTL |
+| `PROVIDER_CACHE_TABLE_NAME` | `provider_cache_entries` | Postgres cache table name |
+| `PROVIDER_CACHE_CONNECT_TIMEOUT_SECONDS` | `3` | DB connection timeout |
+| `PUBLIC_DATA_TIMEOUT_SECONDS` | `2.5` | Timeout for public API calls |
+| `PUBLIC_DATA_USER_AGENT` | `EarthTwinBackend/0.1 ...` | User-Agent sent to Nominatim and others |
+| `OPEN_METEO_WEATHER_URL` | `https://api.open-meteo.com/v1/forecast` | Override for weather API |
+| `OPEN_METEO_AIR_QUALITY_URL` | `https://air-quality-api.open-meteo.com/...` | Override for AQ API |
+| `NOMINATIM_REVERSE_URL` | `https://nominatim.openstreetmap.org/reverse` | Override for reverse geocoding |
+| `NOMINATIM_SEARCH_URL` | `https://nominatim.openstreetmap.org/search` | Override for forward geocoding |
+
+**Postgres component vars (alternative to DATABASE_URL):**
+
+| Variable | Default |
+|---|---|
+| `POSTGRES_HOST` | — |
+| `POSTGRES_PORT` | `5432` |
+| `POSTGRES_DB` | `earth_twin` |
+| `POSTGRES_USER` | `earth_twin` |
+| `POSTGRES_PASSWORD` | `earth_twin` |
+
+---
+
+## Deployment (Render)
+
+**Build command:** `pip install -r requirements.txt`
+**Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+**Health check path:** `/api/v1/health`
+
+**Minimum required env vars on Render:**
+- `GEMINI_API_KEY`
+- `DATABASE_URL` (use the Supabase direct connection URL, port **5432** not 6543)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CORS_ORIGINS` (your frontend domain, no trailing slash)
+
+---
 
 ## Local Development
 
 ```bash
 cd earth-twin-backend
-docker compose up -d postgres
+docker compose up -d postgres        # optional — for persistent provider cache
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate               # Windows
+source .venv/bin/activate            # Mac/Linux
 pip install -r requirements.txt
+cp .env.example .env                 # fill in your keys
 uvicorn app.main:app --reload
 ```
 
-Local URLs:
 - Base URL: `http://127.0.0.1:8000`
-- Swagger docs: `http://127.0.0.1:8000/docs`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+
+The app works without Postgres — it falls back to in-memory provider cache automatically.
+
+---
 
 ## Limitations
 
-- Public-data fetches depend on upstream availability.
-- If a live provider is unavailable, the backend falls back to inferred baseline values so the API remains usable.
-- Provider responses are cached with a TTL so repeated location lookups are faster and less dependent on upstream latency.
-- If Postgres is configured, provider cache snapshots persist across restarts; otherwise the cache is in-memory only.
-- Not all metrics are truly real-time; some are latest-available public indicators or modeled derivatives.
-- The project-impact simulation is still rule-based, not a full scientific forecasting engine.
-- The world state remains in memory.
-- `My Projects` stores saved assessment snapshots, not the mutable world-state timeline.
+- Public-data fetches depend on upstream availability. If a provider is down, the backend uses modeled fallback values.
+- Not all metrics are truly real-time — some use latest-available indicators or modeled derivatives.
+- The simulation is rule-based, not a scientific forecasting engine.
+- The world state is held in memory — it resets on restart unless `POST /world/reset` is called.
+- My Projects stores assessment snapshots, not the full mutable world-state timeline.
+- Text planning currently supports up to 4 geometry points from location extraction. Complex multi-waypoint routes are not yet supported.
+- Signed PDF URLs expire after 1 hour. Calling `GET /my-projects/{id}` regenerates a fresh URL automatically.
 
-## Verification
+---
 
-Current test status:
-- `110 passed, 7 deselected`
+## Test Status
+
+`110 passed, 7 deselected`

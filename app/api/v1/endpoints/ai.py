@@ -29,6 +29,7 @@ def explain_zone(payload: AIExplainRequest) -> AIExplainResponse:
             question=payload.question,
             mode=payload.mode,
             audience=payload.audience,
+            location_label=payload.location_label,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -50,6 +51,7 @@ def goal_to_actions(payload: GoalToActionsRequest) -> GoalToActionsResponse:
             goal=payload.goal,
             zone_data=zone_data,
             zone_id=payload.zone_id,
+            location_label=payload.location_label,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -96,6 +98,7 @@ def suggest_improvements(payload: SuggestImprovementsRequest) -> SuggestImprovem
             projection_years=payload.projection_years,
             sustainability_score=payload.sustainability_score,
             overall_outlook=payload.overall_outlook,
+            location_label=payload.location_label,
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(

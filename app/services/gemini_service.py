@@ -72,14 +72,15 @@ class GeminiService:
         goal: str,
         zone_data: dict[str, Any],
         zone_id: str,
+        location_label: str | None = None,
     ) -> list[dict[str, Any]]:
-        zone_name = zone_data.get("name", zone_id)
+        zone_name = location_label or zone_data.get("name", zone_id)
 
         prompt = f"""You are an urban sustainability AI planner.
 
 Goal: {goal}
 
-Target zone: {zone_name}
+Target location: {zone_name}
 Current environmental metrics:
 - Traffic level: {zone_data.get('traffic_level', 0)}/100
 - Pollution level: {zone_data.get('pollution_level', 0)}/100
@@ -140,7 +141,7 @@ Instructions:
 - For "location_mentions": extract an ORDERED list of distinct geocodable locations that define the geometry of the project (max 4). For a road or linear infrastructure, list start point first then end point — e.g. ["Union Station, Chicago, IL", "O'Hare Airport, Chicago, IL"]. For a point/area project (airport site, terminal), list only the center location — e.g. ["Midway Airport area, Chicago, IL"]. Include street addresses, zip codes, or landmarks as given. If only one location is mentioned, return a single-element list. If no location at all, return [].
 
 Return ONLY valid JSON with exactly these keys:
-- infrastructure_type: "airport", "road", null, or "unsupported"
+- infrastructure_type: one of "road", "highway", "bridge", "building", "buildings", "airport", "solar_panel", "solar_farm", "dam", "industrial", null, or "unsupported"
 - project_type: "industrial_facility", "roadway_logistics_expansion", null
 - planner_summary: short normalized summary string
 - infrastructure_details: object with extracted fields only
@@ -211,7 +212,9 @@ Return ONLY valid JSON with exactly these keys:
         projection_years: int,
         sustainability_score: float,
         overall_outlook: str,
+        location_label: str | None = None,
     ) -> str:
+        zone_name = location_label or zone_name
         actions_text = "\n".join(
             f"  * {a.get('action_type', '?').replace('_', ' ').title()}: "
             f"intensity {a.get('intensity', 0):.0%}, {a.get('duration_years', 1)} year(s)"

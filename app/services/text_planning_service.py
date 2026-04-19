@@ -104,11 +104,11 @@ class TextPlanningService:
         if not normalized:
             return None
         if normalized == "unsupported":
-            raise ValueError("Only airport and road text planning is supported in v1.")
-        infrastructure_type = InfrastructureCategory(normalized)
-        if infrastructure_type not in {InfrastructureCategory.AIRPORT, InfrastructureCategory.ROAD}:
-            raise ValueError("Only airport and road text planning is supported in v1.")
-        return infrastructure_type
+            raise ValueError(
+                "That infrastructure type is not supported. Supported types: "
+                "road, highway, bridge, building, airport, solar farm, dam, industrial."
+            )
+        return InfrastructureCategory(normalized)
 
     def _resolve_project_type(
         self,

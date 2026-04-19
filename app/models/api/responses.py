@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.models.domain.action import AudienceType, SimulationMode
 from app.models.domain.planning import (
@@ -230,12 +230,18 @@ class PlannerSimulationInputsResponse(BaseModel):
 
 class PlanScorecardResponse(BaseModel):
     plan_score: float
+    sustainability_score: float = 0.0
     verdict: PlanVerdict
     overall_outlook: str
     highest_risk_zone: CompactZoneSummary | None
     top_risks: list[str]
     required_mitigations: list[str]
     summary_text: str
+
+    @model_validator(mode="after")
+    def sync_sustainability_score(self) -> "PlanScorecardResponse":
+        self.sustainability_score = self.plan_score
+        return self
 
 
 class AnalysisMetricCardResponse(BaseModel):

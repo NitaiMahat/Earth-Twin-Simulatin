@@ -13,11 +13,16 @@ class PlannerProjectType(str, Enum):
 
 class InfrastructureCategory(str, Enum):
     ROAD = "road"
+    HIGHWAY = "highway"
     BRIDGE = "bridge"
+    BUILDING = "building"
     BUILDINGS = "buildings"
     AIRPORT = "airport"
     GENERAL_AREA = "general_area"
     SOLAR_PANEL = "solar_panel"
+    SOLAR_FARM = "solar_farm"
+    DAM = "dam"
+    INDUSTRIAL = "industrial"
 
 
 class PlanningFieldType(str, Enum):
