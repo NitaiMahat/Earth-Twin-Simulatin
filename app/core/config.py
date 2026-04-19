@@ -30,6 +30,10 @@ class Settings:
         "NOMINATIM_REVERSE_URL",
         "https://nominatim.openstreetmap.org/reverse",
     )
+    nominatim_search_url: str = os.getenv(
+        "NOMINATIM_SEARCH_URL",
+        "https://nominatim.openstreetmap.org/search",
+    )
     public_data_user_agent: str = os.getenv(
         "PUBLIC_DATA_USER_AGENT",
         "EarthTwinBackend/0.1 (planning baseline lookup)",
@@ -86,6 +90,23 @@ class Settings:
     @property
     def provider_cache_database_url(self) -> str:
         return self.database_connection_url
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        base_url = self.supabase_url.strip().rstrip("/")
+        if not base_url:
+            return ""
+        return f"{base_url}/auth/v1/.well-known/jwks.json"
+
+    @property
+    def resolved_supabase_jwt_issuer(self) -> str:
+        explicit_issuer = self.supabase_jwt_issuer.strip()
+        if explicit_issuer:
+            return explicit_issuer
+        base_url = self.supabase_url.strip().rstrip("/")
+        if not base_url:
+            return ""
+        return f"{base_url}/auth/v1"
 
     @property
     def base_dir(self) -> Path:

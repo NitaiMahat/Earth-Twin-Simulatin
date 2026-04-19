@@ -355,7 +355,7 @@ Optional tuning:
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
-- `SUPABASE_JWT_SECRET`
+- `SUPABASE_JWT_SECRET` for legacy HS256 projects only
 - `SUPABASE_JWT_AUDIENCE`
 - `SUPABASE_JWT_ISSUER`
 - `SUPABASE_URL`
@@ -395,6 +395,8 @@ The backend creates the provider-cache table automatically on first use. If Post
 The same Postgres connection is also used for authenticated `My Projects` storage.
 
 If Supabase Storage is configured, the backend can also generate a project PDF, upload it to the configured bucket, and save the file metadata back onto the project record.
+
+For modern Supabase projects using rotating signing keys like `ECC (P-256)`, the backend verifies access tokens through the project JWKS endpoint derived from `SUPABASE_URL`. In that setup, `SUPABASE_JWT_SECRET` is not required.
 
 ## Local Development
 

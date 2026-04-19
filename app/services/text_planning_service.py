@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from app.models.api.requests import TextPlanningOverridesRequest
 from app.models.api.responses import (
     PlanningLocationContextResponse,
+    SuggestedGeometryPoint,
     TextPlanningExtractionResponse,
     TextPlanningRunResponse,
 )
@@ -120,13 +121,55 @@ class TextPlanningService:
             return None
         return PlannerProjectType(str(raw_project_type))
 
+    def _geocode_location_mentions(self, mentions: list[str]) -> list[SuggestedGeometryPoint]:
+        points: list[SuggestedGeometryPoint] = []
+        for mention in mentions:
+            result = public_baseline_service.forward_geocode(mention)
+            if result:
+                display = str(result.get("display_name", mention))
+                points.append(SuggestedGeometryPoint(
+                    latitude=float(result.get("lat", 0)),
+                    longitude=float(result.get("lon", 0)),
+                    label=display.split(",")[0].strip(),
+                ))
+        return points
+
+    def _resolve_location(
+        self,
+        location: PlanningLocationInput | None,
+        location_query: str | None,
+    ) -> tuple[PlanningLocationInput, str | None, str | None]:
+        """
+        Returns (resolved_location, resolved_zone_id, resolved_location_label).
+        Tries explicit location first, then geocodes location_query from prompt.
+        """
+        if location is not None:
+            ctx = self._location_context_response(location)
+            return location, ctx.baseline_zone_id, ctx.label
+
+        if location_query:
+            geocoded = public_baseline_service.forward_geocode(location_query)
+            if geocoded:
+                lat = float(geocoded.get("lat", 0))
+                lon = float(geocoded.get("lon", 0))
+                display = str(geocoded.get("display_name", location_query))
+                short_label = display.split(",")[0].strip()
+                resolved = PlanningLocationInput(latitude=lat, longitude=lon, label=short_label)
+                ctx = self._location_context_response(resolved)
+                return resolved, ctx.baseline_zone_id, ctx.label
+
+        # No location available — use a neutral default so the rest of the pipeline doesn't break
+        fallback = PlanningLocationInput(latitude=0.0, longitude=0.0, label="Unknown location")
+        ctx = self._location_context_response(fallback)
+        return fallback, None, None
+
     def _build_draft(
         self,
         *,
-        location: PlanningLocationInput,
+        location: PlanningLocationInput | None,
         geometry_points: list[GeometryPoint],
         user_prompt: str,
-    ) -> TextPlanningExtractionResponse:
+    ) -> tuple[TextPlanningExtractionResponse, PlanningLocationInput]:
         unsupported_infrastructure = planning_rag_service.detect_unsupported_infrastructure(user_prompt)
         if unsupported_infrastructure is not None:
             raise ValueError(
@@ -134,20 +177,45 @@ class TextPlanningService:
                 f"'{unsupported_infrastructure.value}'."
             )
 
-        location_context = self._location_context_response(location)
         geometry_summary = planning_service.build_geometry_summary(TEXT_PLANNING_GEOMETRY_TYPE, geometry_points)
         retrieval = planning_rag_service.retrieve_context(user_prompt)
+
+        location_hint = (
+            (location.label or f"{location.latitude:.4f},{location.longitude:.4f}")
+            if location is not None
+            else "Not specified — extract from the user prompt"
+        )
+
         extracted = gemini_service.extract_text_plan(
             user_prompt=user_prompt,
             retrieved_context=str(retrieval["context_text"]),
-            location_label=location_context.label,
+            location_label=location_hint,
             geometry_summary=geometry_summary.model_dump(mode="json"),
         )
+
+        resolved_location, resolved_zone_id, resolved_location_label = self._resolve_location(
+            location, extracted.get("location_query")
+        )
+        location_context = self._location_context_response(resolved_location)
+
+        suggested_geometry_points = self._geocode_location_mentions(
+            extracted.get("location_mentions", [])
+        )
+
+        if resolved_zone_id is None and extracted.get("location_query"):
+            assumptions_note = (
+                f"Could not geocode '{extracted['location_query']}' — zone auto-selection unavailable. "
+                "Select a zone manually on the map."
+            )
+        else:
+            assumptions_note = None
 
         infrastructure_type = self._resolve_infrastructure_type(extracted.get("infrastructure_type"))
         project_type = self._resolve_project_type(infrastructure_type, extracted.get("project_type"))
         planner_summary = str(extracted.get("planner_summary") or user_prompt).strip()
         assumptions = list(extracted.get("assumptions", []))
+        if assumptions_note:
+            assumptions.append(assumptions_note)
         confidence = float(extracted.get("confidence", 0.0))
 
         merged_details: dict[str, str | int | float | bool] = {}
@@ -201,7 +269,7 @@ class TextPlanningService:
             and confidence >= TEXT_PLANNING_CONFIDENCE_THRESHOLD
         )
 
-        return TextPlanningExtractionResponse(
+        response = TextPlanningExtractionResponse(
             location_context=location_context,
             geometry_summary=geometry_summary,
             infrastructure_type=infrastructure_type,
@@ -215,32 +283,37 @@ class TextPlanningService:
             assumptions=list(dict.fromkeys(assumptions)),
             confidence=round(confidence, 2),
             simulation_ready=simulation_ready,
+            resolved_zone_id=resolved_zone_id,
+            resolved_location_label=resolved_location_label,
+            suggested_geometry_points=suggested_geometry_points,
         )
+        return response, resolved_location
 
     def draft_from_text(
         self,
         *,
-        location: PlanningLocationInput,
+        location: PlanningLocationInput | None,
         geometry_points: list[GeometryPoint],
         user_prompt: str,
     ) -> TextPlanningExtractionResponse:
-        return self._build_draft(
+        response, _ = self._build_draft(
             location=location,
             geometry_points=geometry_points,
             user_prompt=user_prompt,
         )
+        return response
 
     def run_from_text(
         self,
         *,
-        location: PlanningLocationInput,
+        location: PlanningLocationInput | None,
         geometry_points: list[GeometryPoint],
         user_prompt: str,
         mitigation_commitment: MitigationCommitment,
         confirmed_overrides: TextPlanningOverridesRequest | None,
         planner_notes: str | None,
     ) -> TextPlanningRunResponse:
-        draft = self._build_draft(
+        draft, resolved_location = self._build_draft(
             location=location,
             geometry_points=geometry_points,
             user_prompt=user_prompt,
@@ -283,7 +356,7 @@ class TextPlanningService:
             )
 
         assessment = planning_service.assess_proposal(
-            location=location,
+            location=resolved_location,
             project_type=None,
             infrastructure_type=infrastructure_type,
             geometry_points=geometry_points,
@@ -311,6 +384,9 @@ class TextPlanningService:
             assumptions=draft.assumptions,
             confidence=draft.confidence,
             simulation_ready=True,
+            resolved_zone_id=draft.resolved_zone_id,
+            resolved_location_label=draft.resolved_location_label,
+            suggested_geometry_points=draft.suggested_geometry_points,
         )
         return TextPlanningRunResponse(extraction=extraction, assessment=assessment)
 

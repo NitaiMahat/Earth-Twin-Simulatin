@@ -287,6 +287,12 @@ class ProposalAssessmentResponse(BaseModel):
     simulation_inputs: PlannerSimulationInputsResponse
 
 
+class SuggestedGeometryPoint(BaseModel):
+    latitude: float
+    longitude: float
+    label: str
+
+
 class TextPlanningExtractionResponse(BaseModel):
     location_context: PlanningLocationContextResponse
     geometry_summary: GeometryLocationSummaryResponse
@@ -301,6 +307,9 @@ class TextPlanningExtractionResponse(BaseModel):
     assumptions: list[str]
     confidence: float
     simulation_ready: bool
+    resolved_zone_id: str | None = None
+    resolved_location_label: str | None = None
+    suggested_geometry_points: list[SuggestedGeometryPoint] = []
 
 
 class TextPlanningRunResponse(BaseModel):

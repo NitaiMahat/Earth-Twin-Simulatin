@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.domain.action import AudienceType, SimulationMode
 from app.models.domain.planning import (
@@ -160,9 +160,11 @@ class SavedTextPlanningSnapshotRequest(BaseModel):
 
 
 class TextPlanningDraftRequest(BaseModel):
-    location: PlanningLocationInput
-    geometry_points: list[GeometryPoint] = Field(min_length=2)
-    user_prompt: str = Field(min_length=5, max_length=4000)
+    model_config = ConfigDict(populate_by_name=True)
+
+    location: PlanningLocationInput | None = None
+    geometry_points: list[GeometryPoint] = Field(default_factory=list)
+    user_prompt: str = Field(min_length=5, max_length=4000, alias="prompt")
     project_name: str | None = Field(default=None, min_length=3, max_length=120)
     planner_notes: str | None = None
 
