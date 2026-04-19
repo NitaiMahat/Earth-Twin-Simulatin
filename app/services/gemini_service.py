@@ -136,6 +136,8 @@ Instructions:
 - If the user's prompt is ambiguous between the supported types, set "infrastructure_type" to null and explain in assumptions.
 - If the prompt clearly asks for an unsupported type, set "infrastructure_type" to "unsupported".
 - Keep missing required values in "missing_fields" instead of guessing.
+- For "location_query": extract the single best real-world location for zone resolution (city, address, zip, landmark+city). Use enough detail for geocoding — e.g. "Chicago, IL, USA" or "60601, Chicago" or "near the Bean, Chicago". If no location is mentioned, set to null.
+- For "location_mentions": extract an ORDERED list of distinct geocodable locations that define the geometry of the project (max 4). For a road or linear infrastructure, list start point first then end point — e.g. ["Union Station, Chicago, IL", "O'Hare Airport, Chicago, IL"]. For a point/area project (airport site, terminal), list only the center location — e.g. ["Midway Airport area, Chicago, IL"]. Include street addresses, zip codes, or landmarks as given. If only one location is mentioned, return a single-element list. If no location at all, return [].
 
 Return ONLY valid JSON with exactly these keys:
 - infrastructure_type: "airport", "road", null, or "unsupported"
@@ -146,6 +148,8 @@ Return ONLY valid JSON with exactly these keys:
 - assumptions: array of short strings
 - confidence: number from 0 to 1
 - simulation_ready: boolean
+- location_query: string with the best single location for zone resolution, or null
+- location_mentions: ordered array of geocodable location strings for geometry point generation
 """
 
         payload = self._parse_json_response(self._generate(prompt))
@@ -171,6 +175,19 @@ Return ONLY valid JSON with exactly these keys:
         if not isinstance(details, dict):
             raise ValueError("Gemini returned non-object infrastructure_details")
 
+        location_query = payload.get("location_query")
+        if location_query is not None and not isinstance(location_query, str):
+            location_query = None
+        if isinstance(location_query, str):
+            location_query = location_query.strip() or None
+
+        raw_mentions = payload.get("location_mentions", [])
+        location_mentions: list[str] = []
+        if isinstance(raw_mentions, list):
+            for item in raw_mentions[:4]:
+                if isinstance(item, str) and item.strip():
+                    location_mentions.append(item.strip())
+
         return {
             "infrastructure_type": infrastructure_type,
             "project_type": project_type,
@@ -180,6 +197,8 @@ Return ONLY valid JSON with exactly these keys:
             "assumptions": [str(item).strip() for item in assumptions if str(item).strip()],
             "confidence": max(0.0, min(1.0, float(payload.get("confidence", 0.0)))),
             "simulation_ready": bool(payload.get("simulation_ready", False)),
+            "location_query": location_query,
+            "location_mentions": location_mentions,
         }
 
     def suggest_improvements(

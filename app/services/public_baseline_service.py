@@ -232,6 +232,26 @@ class PublicBaselineService:
                 latest_by_country[country_code] = round(float(value), 2)
         return self._cache_set(cache_key, latest_by_country)
 
+    def forward_geocode(self, query: str) -> dict[str, Any] | None:
+        if not query or not query.strip():
+            return None
+        normalized = query.strip()
+        cache_key = f"forward_geocode:{normalized.lower()}"
+        cached = self._cache_get(cache_key)
+        if isinstance(cached, dict):
+            return cached
+
+        payload = self._request_json(
+            settings.nominatim_search_url,
+            {"q": normalized, "format": "jsonv2", "limit": 1, "addressdetails": 1},
+        )
+        if not isinstance(payload, list) or not payload:
+            return None
+        result = payload[0]
+        if not isinstance(result, dict):
+            return None
+        return self._cache_set(cache_key, result)
+
     def _reverse_geocode(self, latitude: float, longitude: float) -> dict[str, Any]:
         cache_key = f"reverse_geocode:{self._coordinate_key(latitude, longitude)}"
         cached = self._cache_get(cache_key)
