@@ -16,12 +16,15 @@ class AIService:
         question: str,
         mode: SimulationMode,
         audience: AudienceType,
+        location_label: str | None = None,
     ) -> AIExplainResponse:
         zone = zone_repository.get_zone(zone_id)
         if zone is None:
             raise ValueError(f"Zone '{zone_id}' was not found.")
 
         zone = impact_service.normalize_zone(zone)
+        if location_label:
+            zone = zone.model_copy(update={"name": location_label})
         cleaned_context = context.strip()
         tone = self._resolve_tone(mode, audience)
 

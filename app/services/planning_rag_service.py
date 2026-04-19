@@ -8,13 +8,19 @@ from app.services.planning_service import planning_service
 SUPPORTED_TEXT_INFRASTRUCTURE = (
     InfrastructureCategory.AIRPORT,
     InfrastructureCategory.ROAD,
+    InfrastructureCategory.BRIDGE,
+    InfrastructureCategory.BUILDINGS,
+    InfrastructureCategory.BUILDING,
+    InfrastructureCategory.HIGHWAY,
+    InfrastructureCategory.DAM,
+    InfrastructureCategory.SOLAR_PANEL,
+    InfrastructureCategory.SOLAR_FARM,
+    InfrastructureCategory.INDUSTRIAL,
 )
 
-UNSUPPORTED_KEYWORDS = {
-    InfrastructureCategory.BRIDGE: ("bridge", "flyover", "overpass"),
-    InfrastructureCategory.BUILDINGS: ("building", "buildings", "residential", "commercial", "tower"),
-    InfrastructureCategory.GENERAL_AREA: ("district", "redevelopment", "site preparation", "land conversion"),
-    InfrastructureCategory.SOLAR_PANEL: ("solar", "panel", "photovoltaic", "battery storage"),
+# Only truly unsupported free-form types that should be rejected early
+UNSUPPORTED_KEYWORDS: dict[InfrastructureCategory, tuple[str, ...]] = {
+    InfrastructureCategory.GENERAL_AREA: ("land conversion", "site preparation"),
 }
 
 
@@ -28,7 +34,7 @@ class PlanningRagService:
     def detect_unsupported_infrastructure(self, user_prompt: str) -> InfrastructureCategory | None:
         prompt = user_prompt.lower()
         for infrastructure_type, keywords in UNSUPPORTED_KEYWORDS.items():
-            if any(keyword in prompt for keyword in keywords):
+            if any(re.search(r"\b" + re.escape(kw) + r"\b", prompt) for kw in keywords):
                 return infrastructure_type
         return None
 
@@ -53,7 +59,17 @@ class PlanningRagService:
             score = len(prompt_tokens & section_tokens)
             if section.infrastructure_type == InfrastructureCategory.AIRPORT and {"airport", "runway", "terminal", "apron"} & prompt_tokens:
                 score += 3
-            if section.infrastructure_type == InfrastructureCategory.ROAD and {"road", "roads", "lane", "highway", "corridor"} & prompt_tokens:
+            if section.infrastructure_type in {InfrastructureCategory.ROAD, InfrastructureCategory.HIGHWAY} and {"road", "roads", "lane", "highway", "corridor", "freeway", "motorway"} & prompt_tokens:
+                score += 3
+            if section.infrastructure_type == InfrastructureCategory.BRIDGE and {"bridge", "flyover", "overpass", "crossing", "span"} & prompt_tokens:
+                score += 3
+            if section.infrastructure_type in {InfrastructureCategory.BUILDINGS, InfrastructureCategory.BUILDING} and {"building", "buildings", "residential", "commercial", "offices"} & prompt_tokens:
+                score += 3
+            if section.infrastructure_type == InfrastructureCategory.DAM and {"dam", "reservoir", "hydro", "weir"} & prompt_tokens:
+                score += 3
+            if section.infrastructure_type in {InfrastructureCategory.SOLAR_PANEL, InfrastructureCategory.SOLAR_FARM} and {"solar", "photovoltaic", "panel", "renewable"} & prompt_tokens:
+                score += 3
+            if section.infrastructure_type == InfrastructureCategory.INDUSTRIAL and {"industrial", "factory", "plant", "warehouse", "facility"} & prompt_tokens:
                 score += 3
             ranked_sections.append((score, section))
 

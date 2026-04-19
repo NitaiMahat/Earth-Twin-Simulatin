@@ -42,6 +42,7 @@ class AIExplainRequest(BaseModel):
     question: str
     mode: SimulationMode = SimulationMode.PLANNING
     audience: AudienceType | None = None
+    location_label: str | None = None
 
     @model_validator(mode="after")
     def apply_default_audience(self) -> "AIExplainRequest":
@@ -114,6 +115,7 @@ class GoalToActionsRequest(BaseModel):
     goal: str = Field(min_length=5, max_length=500)
     zone_id: str
     base_world_id: str = "global_continental_baseline"
+    location_label: str | None = None
 
 
 class SuggestImprovementsRequest(BaseModel):
@@ -126,6 +128,7 @@ class SuggestImprovementsRequest(BaseModel):
     projection_years: int = Field(ge=1, le=50)
     sustainability_score: float
     overall_outlook: str
+    location_label: str | None = None
 
 
 class GenerateReportRequest(BaseModel):
